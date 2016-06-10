@@ -1,0 +1,21 @@
+{
+  "name": "test",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {"start": "node main.js",
+    "mon": "nodemon server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.15.1",
+    "compression": "^1.6.2",
+    "dhparam": "^1.0.3",
+    "express": "^4.11.1",
+    "helmet": "^2.1.0",
+    "pg": "^4.5.6",
+    "sequelize": "^3.23.3"
+  }
+}

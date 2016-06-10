@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width">
+    <meta charset="utf-8">
+	<title>SVGEdit</title>
+	<link rel="stylesheet" href="svgedit.css">
+	<link rel="stylesheet" href="https://opensource.keycdn.com/fontawesome/4.5.0/font-awesome.min.css">
+</head>
+<body>
+	<div class="sve-root sve-docked-toolbox sve-docked-propbox sve-docked-toolbar">
+		<div class="sve-document-container">
+			<div class="sve-document sve-window-drag-parent sve-window-ordered sve-restored sve-resizable sve-hidden"
+				data-sve-doc-id="">
+				<div class="sve-doc-title sve-window-drag-handle">Untitled.svg</div>
+				<button class="sve-doc-button sve-doc-max"><i class="fa fa-square-o"></i></button>
+				<button class="sve-doc-button sve-doc-close"><i class="fa fa-close"></i></button>
+				<div class="sve-scrollparent">
+					<div class="sve-scrollchild"
+						><svg	class="sve-svg"
+								xmlns="http://www.w3.org/2000/svg" version="1.1"
+								xmlns:xlink="http://www.w3.org/1999/xlink">
+							<defs>
+								<marker id="unique-triangle" viewBox="0 0 10 10"
+										refX="1" refY="5"
+										markerWidth="6" markerHeight="6"
+										orient="auto">
+									<path d="M 0 0 L 10 5 L 0 10 z"></path>
+								</marker>
+								<pattern id="smallGrid" width="8" height="8" patternUnits="userSpaceOnUse">
+									<path d="M 8 0 L 0 0 0 8" fill="none" stroke="gray" stroke-width="0.5"></path>
+								</pattern>
+								<pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse">
+									<rect width="64" height="64" fill="url(#smallGrid)"></rect>
+									<path d="M 64 0 L 0 0 0 64" fill="none" stroke="gray" stroke-width="1"></path>
+								</pattern>
+							</defs>
+							<rect class="sve-gridelement" x="0" y="0" width="640" height="480" fill="url(#grid)"></rect>
+						</svg>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="sve-toolbox sve-window-drag-parent">
+			<h1 class="sve-toolbox-title  sve-window-drag-handle">Tool</h1>
+			<div class="sve-toolbox-items">
+				<div class="sve-toolbox-item">
+					<input id="sve-tool-sel" type="radio" name="tool" class="sve-toolbox-item-checkbox" value="sel" checked title="Select tool">
+					<label tabindex="0" for="sve-tool-sel"><i class="sve-toolbox-item-icon fa fa-mouse-pointer"></i></label>
+				</div>
+				<div class="sve-toolbox-item">
+					<input id="sve-tool-zoo" type="radio" name="tool" class="sve-toolbox-item-checkbox" value="zoo" title="Zoom tool">
+					<label tabindex="0" for="sve-tool-zoo"><i class="sve-toolbox-item-icon fa fa-search"></i></label>
+				</div>
+				<div class="sve-toolbox-item">
+					<input id="sve-tool-nod" type="radio" name="tool" class="sve-toolbox-item-checkbox" value="nod" title="Node edit tool">
+					<label tabindex="0" for="sve-tool-nod"><i class="sve-toolbox-item-icon fa fa-location-arrow fa-flip-horizontal"></i></label>
+				</div>
+				<div class="sve-toolbox-item">
+					<input id="sve-tool-lin" type="radio" name="tool" class="sve-toolbox-item-checkbox" value="lin" title="Line tool">
+					<label tabindex="0" for="sve-tool-lin"><i class="sve-toolbox-item-icon fa fa-pencil"></i></label>
+				</div>
+				<div class="sve-toolbox-item">
+					<input id="sve-tool-box" type="radio" name="tool" class="sve-toolbox-item-checkbox" value="box">
+					<label tabindex="0" for="sve-tool-box"><i class="sve-toolbox-item-icon fa fa-square-o"></i></label>
+				</div>
+				<div class="sve-toolbox-item">
+					<input id="sve-tool-cir" type="radio" name="tool" class="sve-toolbox-item-checkbox" value="cir">
+					<label tabindex="0" for="sve-tool-cir"><i class="sve-toolbox-item-icon fa fa-circle-thin"></i></label>
+				</div>
+				<div class="sve-toolbox-item">
+					<input id="sve-tool-sha" type="radio" name="tool" class="sve-toolbox-item-checkbox" value="sha">
+					<label tabindex="0" for="sve-tool-sha"><i class="sve-toolbox-item-icon fa fa-gear"></i></label>
+				</div>
+				<div class="sve-toolbox-item">
+					<input id="sve-tool-txt" type="radio" name="tool" class="sve-toolbox-item-checkbox" value="txt">
+					<label tabindex="0" for="sve-tool-txt"><i class="sve-toolbox-item-icon fa fa-font"></i></label>
+				</div>
+				<div class="sve-toolbox-item">
+					<input id="sve-tool-img" type="radio" name="tool" class="sve-toolbox-item-checkbox" value="img">
+					<label tabindex="0" for="sve-tool-img"><i class="sve-toolbox-item-icon fa fa-image"></i></label>
+				</div>
+			</div>
+		</div>
+		<div class="sve-propbox sve-window-drag-parent sve-resizable">
+			<h1 class="sve-propbox-title sve-window-drag-handle">Properties</h1>
+			<div class="sve-propbox-scrollparent">
+				<div class="sve-propbox-scrollchild">
+				</div>
+			</div>
+		</div>
+		<div class="sve-toolbar">
+			<div class="sve-toolbar-buttons">
+				<button class="sve-toolbar-button" name="new">
+					<i class="sve-toolbar-button-icon fa fa-plus"></i>
+					<span class="sve-toolbar-button-text">New</span>
+				</button
+				><button class="sve-toolbar-button" name="open">
+					<i class="sve-toolbar-button-icon fa fa-file-text-o"></i>
+					<span class="sve-toolbar-button-text">Open</span>
+				</button
+				><button class="sve-toolbar-button" name="save">
+					<i class="sve-toolbar-button-icon fa fa-save"></i>
+					<span class="sve-toolbar-button-text">Save</span>
+				</button
+				><button class="sve-toolbar-button" name="undo">
+					<i class="sve-toolbar-button-icon fa fa-undo"></i>
+					<span class="sve-toolbar-button-text">Undo</span>
+				</button
+				><button class="sve-toolbar-button" name="redo"
+					><i class="sve-toolbar-button-icon fa fa-undo fa-flip-horizontal"></i>
+					<span class="sve-toolbar-button-text">Redo</span>
+				</button
+				><button class="sve-toolbar-button" name="delete">
+					<i class="sve-toolbar-button-icon fa fa-trash"></i>
+					<span class="sve-toolbar-button-text">Delete</span>
+				</button
+				><button class="sve-toolbar-button" name="top">
+					<i class="sve-toolbar-button-icon fa fa-angle-double-up"></i>
+					<span class="sve-toolbar-button-text">Top</span>
+				</button
+				><button class="sve-toolbar-button" name="up">
+					<i class="sve-toolbar-button-icon fa fa-angle-up"></i>
+					<span class="sve-toolbar-button-text">Up</span>
+				</button
+				><button class="sve-toolbar-button" name="down">
+					<i class="sve-toolbar-button-icon fa fa-angle-down"></i>
+					<span class="sve-toolbar-button-text">Down</span>
+				</button
+				><button class="sve-toolbar-button" name="bottom">
+					<i class="sve-toolbar-button-icon fa fa-angle-double-down"></i>
+					<span class="sve-toolbar-button-text">Bottom</span>
+				</button
+			></div>
+		</div>
+	</div>
+	<script src="vendor/promise.js"></script>
+	<script src="vendor/polyfill.js"></script>
+	<script src="svgedit.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+/doug16k.com/nbproject/private/
+/nbproject/private/
+/node_modules/
+public/video
+chatserverconfig.js
+ticketkeys.dat
+dhparam.pem
+doug16k-ca-2.pem
+doug16k-ca.pem
+doug16k-crt.crt
+doug16k-key.pem            

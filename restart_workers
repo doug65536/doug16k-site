@@ -1,0 +1,7 @@
+#!/bin/bash
+TARGETPID=$(ps aux | \
+	grep -oP '(root\s+\d+)(?=.*node\ server.js)' | \
+	grep -oP '(?<=root)\s+(\d+)')
+echo Recycling PID $TARGETPID
+ps -aq $TARGETPID
+kill -SIGHUP $TARGETPID
