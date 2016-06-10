@@ -1,0 +1,6 @@
+{
+  "name": "Doug16k-site",
+  "tagline": "NodeJS server",
+  "body": "#doug16k.com\r\n\r\n## Chat\r\n\r\n### Endpoints\r\n\r\n`GET /api/wschat/users/message/stream?since=n`\r\n\r\n`n` is the start id\r\n\r\nWaits up to 3.5 minutes for a message. All messages available since the specified id, up to a server defined limit, are send as the response. You are expected to immediately request the next message, using the highest id you know, as the value for `since`.\r\n\r\n`POST /api/wschat/users/message/stream`\r\n",
+  "note": "Don't delete this file! It's used internally to help with page regeneration."
+}

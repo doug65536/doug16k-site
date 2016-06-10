@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="description" content="Doug16k-site : NodeJS server">
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>Doug16k-site</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/doug65536/doug16k-site">View on GitHub</a>
+
+          <h1 id="project_title">Doug16k-site</h1>
+          <h2 id="project_tagline">NodeJS server</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/doug65536/doug16k-site/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/doug65536/doug16k-site/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <h1>
+<a id="doug16kcom" class="anchor" href="#doug16kcom" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>doug16k.com</h1>
+
+<h2>
+<a id="chat" class="anchor" href="#chat" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Chat</h2>
+
+<h3>
+<a id="endpoints" class="anchor" href="#endpoints" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Endpoints</h3>
+
+<p><code>GET /api/wschat/users/message/stream?since=n</code></p>
+
+<p><code>n</code> is the start id</p>
+
+<p>Waits up to 3.5 minutes for a message. All messages available since the specified id, up to a server defined limit, are send as the response. You are expected to immediately request the next message, using the highest id you know, as the value for <code>since</code>.</p>
+
+<p><code>POST /api/wschat/users/message/stream</code></p>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Doug16k-site maintained by <a href="https://github.com/doug65536">doug65536</a></p>
+        <p>Published with <a href="https://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+    
+
+  </body>
+</html>
