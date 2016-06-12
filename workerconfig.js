@@ -5,11 +5,11 @@ module.exports.config = {
     serverOptions: {
         passphrase: 'Ryeshemniab2JetDirn1Tubdyp3Freyp',
         ca: [
-            fs.readFileSync("doug16k-ca.pem"),
-            fs.readFileSync("doug16k-ca-2.pem")
+            fs.readFileSync("ssl/doug16k-ca.pem"),
+            fs.readFileSync("ssl/doug16k-ca-2.pem")
         ],
-        key: fs.readFileSync("doug16k-key.pem"),
-        cert: fs.readFileSync("doug16k-crt.crt"),
+        key: fs.readFileSync("ssl/doug16k-key.pem"),
+        cert: fs.readFileSync("ssl/doug16k-crt.crt"),
         ciphers: ([
             'ECDHE-RSA-AES128-GCM-SHA256',
             'ECDHE-ECDSA-AES128-GCM-SHA256',

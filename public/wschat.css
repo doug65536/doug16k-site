@@ -63,10 +63,37 @@
     box-sizing: border-box;
 }
 
+.chat-editing {
+    background: #FDA;
+}
+
 .chat-component .chat-messages,
 .chat-component .chat-sender,
+.chat-component .chat-time,
 .chat-component .chat-text {
     transform: scaleY(-1);
+}
+
+.chat-component .chat-link {
+    padding: 0px;
+}
+
+.chat-component a,
+.chat-component a:visited,
+.chat-component a:active {
+    text-decoration: none;
+    color: #12C;
+}
+
+.chat-component .chat-code {
+    font-family: monospace;
+    margin: 0px;
+    padding: 2px 6px;
+    background: #E6E6E6;
+}
+
+.chat-component .chat-text-span {
+    padding: 0px;
 }
 
 .chat-component .chat-messages {
@@ -80,6 +107,7 @@
 }
 
 .chat-component .chat-message .chat-sender,
+.chat-component .chat-message .chat-time,
 .chat-component .chat-message .chat-text {
     display: flex;
     border: none;/*solid #EEE 1px;*/
@@ -87,23 +115,57 @@
     padding: 0px;
 }
 
+.chat-component .chat-message .chat-time {
+    margin-right: 8px;
+    text-align: right;
+    width: 44px;
+    font-size: 0.7em;
+    padding-right: 4px;
+    display: inline-block;
+}
+
 .chat-component .chat-message {
     margin-left: 8px;
     margin-right: 8px;
 }
 
+.chat-component .chat-message.chat-message-own .chat-text {
+    border-left: solid #EEE;
+    border-size: 0px 0px 0px 2px;
+    margin-left: 0px;
+    padding-left: 8px;
+}
+
+.chat-component .chat-message.chat-message-own {
+    background: #F8F8F8;
+}
+.chat-component .chat-message.chat-message-not-own {
+    background: #F0F0F0;
+}
+
 .chat-component .chat-message .chat-text {
     margin-left: 8px;
+    padding-left: 2px;
 }
 
 .chat-component .chat-message .chat-sender {
+    display: inline;
     width: 128px;
-    max-width: 128px;
+    font-size: 0.7em;
+    width: 96px;
     overflow: hidden;
     text-align: right;
+    padding-right: 12px;
+    height: 27px;
 }
+
 .chat-component .chat-message .chat-text {
     flex: 1;
+}
+
+.chat-component .chat-message .chat-text p {
+    margin: 0;
+    padding: 0;
 }
 
 .chat-component .chat-problem {
@@ -144,7 +206,7 @@
 
 .chat-component,
 .chat-component input {
-    font-family: 'Amiri';
+    font-family: Amiri;
     font-size: 1.1em;
 }
 

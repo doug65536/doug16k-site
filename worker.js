@@ -2,6 +2,7 @@
 
 var cluster = require('cluster'),
     fs = require('fs'),
+    path = require('path'),
     ipc = require('./cluster-ipc'),
     guid = '683123cc-8214-44a1-a456-aa5c544698ca',
     appModules = [
@@ -152,6 +153,43 @@ function worker() {
         appModule.worker(cluster, app, jsonParser);
     });
 
+    var templateData = {
+        head: fs.readFileSync('private/pagehead.html', 'utf8'),
+        foot: fs.readFileSync('private/pagefoot.html', 'utf8')
+    };
+    
+    var templateCache = {};
+
+    app.get('/*.html', function(req, res) {
+        var cacheSlot = templateCache[req.path];
+        if (!cacheSlot) {
+            cacheSlot = readFileAsync('public/' + req.path, 'utf8')
+            .then(function(file) {
+                var basename = path.basename(req.path, '.html'),
+                    head = processTemplate(templateData.head, {
+                        basename: basename
+                    }),
+                    foot = processTemplate(templateData.foot, {
+                        basename: basename
+                    });
+                return [head, file, foot];
+            }, function(err) {
+                throw new Error('read error', 'public/' + req.path);
+            });
+            templateCache[req.path] = cacheSlot;
+        }
+        cacheSlot.then(function(data) {
+            res.header('Content-Type', 'text/html');
+            console.log(data.length, 'length');
+            data.forEach(function(block) {
+                res.write(block);
+            });
+            res.end();
+        }, function(err) {
+            res.status(500).send(err.toString());
+        });
+    });
+
     // Public server
     staticMiddleware = express.static(__dirname + '/public');
     app.use(staticMiddleware);
@@ -179,6 +217,20 @@ function worker() {
     });
 };
 
+function processTemplate(template, data) {
+    return template.replace(/{{(.*?)}}/g, function(whole, match, offset, input) {
+        var replacement = data[match];
+        if (replacement === undefined) {
+            console.log('warning: missing template data property', match);
+            return '';
+        } else if (typeof replacement === 'function') {
+            return replacement(match, data, input);
+        } else {
+            return data[match];
+        }
+    });
+}
+
 function dhpReadOrGenerate(file) {
     return readFileAsync(file)
         .then(function(dhp) {
@@ -194,9 +246,9 @@ function dhpReadOrGenerate(file) {
         });
 }
 
-function readFileAsync(file) {
+function readFileAsync(file, encoding) {
     return new Promise(function(resolve, reject) {
-        fs.readFile(file, function(err, dhp) {
+        fs.readFile(file, encoding, function(err, dhp) {
             if (!err)
                 resolve(dhp);
             else

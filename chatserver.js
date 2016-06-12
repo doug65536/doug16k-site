@@ -3,7 +3,8 @@
 var cluster = require('cluster'),
     ipc = require('./cluster-ipc'),
     guidMessage = '08b9caf0-02b9-4ad4-9381-ecab048cc168',
-    guidPrimeCache = '5522ba1c-b703-4104-9ad5-1c35825098c0';
+    guidPrimeCache = '5522ba1c-b703-4104-9ad5-1c35825098c0',
+    guidUserList = '0a201ef0-e742-4d49-a7fa-b72016b339c9';
 
 if (cluster.isMaster)
     module.exports.master = master;
@@ -23,10 +24,11 @@ if (cluster.isWorker)
 function master() {
     var nextId = 1,
         chatdb = require('./chatserverdb'),
-        broadcastSender = ipc.makeMasterBroadcastSender(guidMessage);
+        broadcastSender = ipc.makeMasterBroadcastSender(guidMessage),
+        userList = {};
     
     ipc.masterMessageReceiver(guidPrimeCache, function(msg, worker) {
-        chatdb.getLatest().then(function(records) {
+        chatdb.getLatest(128).then(function(records) {
             msg.records = records;
             worker.send(msg);
         });
@@ -35,9 +37,30 @@ function master() {
     ipc.masterMessageReceiver(guidMessage, function(msg, worker) {
         chatdb.insertMessage(msg)
             .then(function(ins) {
-                msg.record.id = ins.id;
+                msg.record = ins;
                 broadcastSender(msg);
             });
+    });
+    
+    ipc.masterMessageReceiver(guidUserList, function(msg, worker) {
+        var touch = msg.touch,
+            existing;
+        
+        if (msg.touch) {
+            existing = userList[touch];
+            
+            // Clear existing timeout
+            if (existing !== undefined)
+                clearTimeout(existing);
+            
+            // Register timeout
+            userList[touch] = setTimeout(function(touch) {
+                delete userList[touch];
+            }, 5 * 60 * 1000, touch);
+
+            msg.userList = Object.keys(userList);
+            worker.send(msg);
+        }
     });
 };
 
@@ -49,9 +72,20 @@ function worker(cluster, app, jsonParser) {
         requestPrimeCache = ipc.makeWorkerSender(guidPrimeCache),
         messages = [],
         nextId = 1,
-        defaultLimit = 1024,
+        defaultLimit = 128,
         messageLimit = 4096,
-        nextUniqueUsername = Date.now() - 1464414604408;
+        nextUniqueUsername = Date.now() - 1464414604408,
+        userListRequests = {},
+        userListRequestNextId = 1,
+        requestUserList = ipc.makeWorkerSender(guidUserList);
+    
+    ipc.workerReceiver(guidUserList, function(msg) {
+        var entry = userListRequests[msg.userListRequestId];
+        delete userListRequests[msg.userListRequestId];
+        
+        entry.res.send(msg.userList);
+        clearTimeout(entry.timeout);
+    });
     
     ipc.workerReceiver(guidMessage, function(msg) {
         appendRecord(msg.record);
@@ -71,20 +105,42 @@ function worker(cluster, app, jsonParser) {
     });
     
     requestPrimeCache({});
+    
+    app.get('/api/wschat/users/online', function(req, res) {
+        var userListRequestId = userListRequestNextId++,
+            entry;
+            
+        entry = {
+            id: userListRequestId,
+            res: res,
+            timeout: 0
+        };
+        
+        entry.timeout = setTimeout(function(entry) {
+            entry.res.status(500).end();
+        }, 5 * 60 * 1000, entry);
+        
+        userListRequests[userListRequestId] = entry;
+        
+        // Send message to master to request user list
+        requestUserList({
+            userListRequestId: userListRequestId
+        });
+    });
 
     app.get('/api/wschat/message/ping', function(req, res) {
         res.send();
     });
 
     app.get('/api/wschat/message/stream', function(req, res) {
-        var since = req.query.since && +req.query.since,
-            lastMessage = messages[messages.length-1],
+        var since = req.query.since && +req.query.since || 0,
+            firstMessage = messages && messages[0],
+            lastMessage = messages && messages[messages.length-1],
             waiter,
             hint;
-            
-        // Bad value becomes 0
-        if (since !== since)
-            since = 0;
+        console.log('since=', since);
+        if (since < 0 && firstMessage)
+            since = firstMessage.id;
         
         if (since !== undefined && 
                 lastMessage &&
@@ -112,7 +168,7 @@ function worker(cluster, app, jsonParser) {
         req.setTimeout(5 * 60 * 1000);
 
         // Timeout in 3.5 minutes
-        waiter.timeout = setTimeout(requestTimedOut, 210000);
+        waiter.timeout = setTimeout(requestTimedOut, 210000, waiter);
 
         function requestClosed() {
             if (waiter.timeout !== undefined) {
@@ -123,7 +179,7 @@ function worker(cluster, app, jsonParser) {
             removeFromQueue(waiter, hint);
         }
         
-        function requestTimedOut() {
+        function requestTimedOut(waiter) {
             waiter.timeout = undefined;
             
             if (removeFromQueue(waiter, hint))
@@ -139,7 +195,6 @@ function worker(cluster, app, jsonParser) {
 
         record = {
             id: 0,
-            timestamp: Date.now(),
             sender: sender,
             message: message
         };
@@ -151,9 +206,7 @@ function worker(cluster, app, jsonParser) {
         
         recipients = waitQueue.length;
 
-        res.send({
-            approxRecipients: recipients
-        });
+        res.send({});
     });
 
     app.get('/api/wschat/unique-username', function(req, res) {

@@ -25,21 +25,50 @@ ChatMessage = db.define('chatmsg', {
 
 module.exports.insertMessage = insertMessage;
 module.exports.getLatest = getLatest;
+module.exports.getSomeFromId = getSomeFromId;
+module.exports.getOlderById = getOlderById;
 
 function insertMessage(msg) {
     return ChatMessage.create(msg.record, {
         raw: true
-    }).then(function(ins) {
-        //console.log('inserted', ins);
-        return ins;
     });
 }
 
-function getLatest() {
+function getLatest(limit) {
     return ChatMessage.findAll({
         order: 'id DESC',
         offset: 0,
-        limit: 1024,
+        limit: limit,
+        raw: true
+    });
+}
+
+// Returns limit records where id >= `id`
+function getSomeFromId(id, limit) {
+    return ChatMessage.findAll({
+        where: {
+            id: {
+                gte: id
+            }
+        },
+        order: 'id DESC',
+        offset: 0,
+        limit: limit,
+        raw: true
+    });
+}
+
+// Returns limit records where id < `id`
+function getOlderById(id, limit) {
+    return ChatMessage.findAll({
+        where: {
+            id: {
+                lt: id
+            }
+        },
+        order: 'id DESC',
+        offset: 0,
+        limit: limit,
         raw: true
     });
 }
