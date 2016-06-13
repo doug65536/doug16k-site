@@ -1,4 +1,4 @@
-(function(window, $, tldLookup) {
+(function loadWSChat(window, $, tldLookup, emojiLookup) {
     "use strict";
     
     var chatUsername = $('.chat-username'),
@@ -17,10 +17,11 @@
         preservedMessage,
         messageLimit = 128;
     
+    // In priority order
     var markupRenderTable = [
         {
             re: /(`+)(.*?)\1/,
-            handler: function(match) {
+            handler: function replaceBacktickCode(match) {
                 return $('<span/>', {
                     'class': 'chat-code',
                     text: match[2]
@@ -29,7 +30,7 @@
         },
         {
             re: /\[(.*?)\]\((http.*)\)/, 
-            handler:  function(match) {
+            handler:  function replaceMarkdownUrl(match) {
                 return $('<a/>', {
                     'class': 'chat-link',
                     'href': match[2],
@@ -39,7 +40,7 @@
         },
         {
             re: /(http\S+)\b/, 
-            handler:  function(match) {
+            handler:  function replaceHttpPrefix(match) {
                 return $('<a/>', {
                     'class': 'chat-link',
                     'href': match[1],
@@ -48,8 +49,8 @@
             }
         },
         {
-            re: /(www\..*)\b/,
-            handler:  function(match) {
+            re: /(www\.\S+)\b/,
+            handler:  function replaceWWWPrefix(match) {
                 return $('<a/>', {
                     'class': 'chat-link',
                     'href': 'http://' + match[1],
@@ -59,10 +60,10 @@
         },
         {
             re: new RegExp('(\\S+\\.(?:' +
-                tldLookup.map(function(tld) {
+                tldLookup.map(function makeTLDRegexFragment(tld) {
                     return '(?:' + tld + ')';
                 }).join('|') + '))\\b', 'i'),
-            handler:  function(match) {
+            handler:  function replaceTLDSuffix(match) {
                 return $('<a/>', {
                     'class': 'chat-link',
                     'href': 'http://' + match[1],
@@ -72,7 +73,7 @@
         },
         {
             re: /(\*+)(.+?)\1/,
-            handler: function(match) {
+            handler: function replaceAsterisks(match) {
                 switch (match[1].length) {
                 case 1:
                     return $('<i/>', {
@@ -87,7 +88,7 @@
         }
     ];
     
-    $(document).on('hashchange', function(event) {
+    $(window.document).on('hashchange', function hashchangeHandler(event) {
         handleHash();
     });
     handleHash();
@@ -98,7 +99,7 @@
             setUsername(username);
     }
     
-    chatUsername.on('input change', function(event) {
+    chatUsername.on('input change', function usernameChangeHandler(event) {
         username = chatUsername.val();
         chatText.prop('disabled', 
             !username || !username.length);
@@ -110,7 +111,7 @@
     if (!username)
         assignUsername();
     
-    chatEntry.on('keypress', function(event) {
+    chatEntry.on('keypress', function chatKeypressHandler(event) {
         var message = chatEntry.val();
         switch (event.which) {
         case 13:
@@ -126,7 +127,7 @@
             });
             break;
         }
-    }).on('keydown', function(event) {
+    }).on('keydown', function chatKeydownHandler(event) {
         var messages,
             message,
             dir,
@@ -198,7 +199,7 @@
                 selectedIndex;
             
             messages = chatMessages.children('.chat-message-own');
-            messages.each(function(i) {
+            messages.each(function findCurrentMessage(i) {
                 var id = +$(this).attr('data-messageid');
                 if (id === currentMessage)
                     selectedIndex = i;
@@ -211,7 +212,7 @@
         }
     }).focus();
     
-    chatMessages.on('wheel', function(event) {
+    chatMessages.on('wheel', function chatWheelHandler(event) {
         event.preventDefault();
         
         var oe = event.originalEvent,
@@ -221,7 +222,7 @@
         
         chatMessages.scrollTop(scroll -
             Math.sign(delta) * dist);
-    }).on('keydown', function(event) {
+    }).on('keydown', function chatKeydownHandler(event) {
         var dist,
             pageHeight = chatMessages.innerHeight(),
             lineHeight = 24,
@@ -275,7 +276,7 @@
     
     function assignUsername() {
         return $.get('/api/wschat/unique-username')
-            .then(function(response) {
+            .then(function uniqueUsernameResponseHandler(response) {
                 if (response.username)
                     return setUsername(response.username);
             });
@@ -290,7 +291,7 @@
         console.log('sendMessage retrying with backoff=', backoff);
         
         later = $.Deferred();
-        setTimeout(function(later) {
+        setTimeout(function sendMessageBackoffHandler(later) {
             later.resolve(attempt());
         }, backoff, later);
         return later.promise();
@@ -303,11 +304,11 @@
                     sender: sender,
                     message: message
                 })
-            }).then(function(response) {
+            }).then(function sendMessageResponseHandler(response) {
                 if (backoff)
                     console.log('sendMessage succeeded at backoff=', backoff);
                 return response;
-            }, function(err) {
+            }, function sendMessageErrorHandler(err) {
                 console.log('sendMessage error:', err);
                 backoff = (backoff && (backoff * 2)) || 100;
                 backoff = Math.min(120000, backoff);
@@ -407,12 +408,11 @@
         
         // Keep applying the first rule until no more rules ran
         // while loop empty body just repeats its condition
-        while (result.some(function(item, index, result) {
+        while (result.some(function renderProcessFragment(item, index, result) {
             if (typeof item !== 'string')
                 return;
             
-            // In priority order
-            return markupRenderTable.some(function(entry) {
+            return markupRenderTable.some(function renderApplyRule(entry) {
                 var match = item.match(entry.re),
                     before,
                     replacement,
@@ -423,15 +423,28 @@
                 before = item.substr(0, match.index);
                 after = item.substr(match.index + match[0].length);
                 replacement = entry.handler(match);
-                result.splice(index, 1, before, replacement, after);
+                
+                // Remove the modified node
+                result.splice(index, 1);
+                
+                // If there was text before
+                if (after)
+                    result.splice(index, 0, after);
+                
+                result.splice(index, 0, replacement);
+                
+                // If there was text after
+                if (before)
+                    result.splice(index, 0, before);
+                
                 return true;
             });
         }));
         
-        return result.filter(function(node) {
+        return result.filter(function renderFilterEmptyString(node) {
             // Get rid of empty string fragments
             return node !== '';
-        }).map(function(node) {
+        }).map(function renderWrapStringsInSpans(node) {
             // Wrap strings in spans
             var span;
             if (typeof node === 'string') {
@@ -441,12 +454,12 @@
                 });
             }
             return node;
-        }).reduce(function(parent, node) {
+        }).reduce(function renderAppendToParagraph(parent, node) {
             // Append everything to a paragraph
             parent.append(node);
             return parent;
         }, $('<p/>'));
-    }        
+    }
     
     // Infinite get request, never resolves,
     // endlessly gets more messages
@@ -457,18 +470,18 @@
             data: {
                 since: lastKnownMessage
             },
-            beforeSend: function(xhr) {
+            beforeSend: function updateBeforeSendHandler(xhr) {
                 xhr.setRequestHeader('X-Auth-Token', '42');
             },
             timeout: 36 * 6 * 1000
-        }).then(function(response) {
+        }).then(function updateResponseHandler(response) {
             if (response.messages) {
                 var items,
                     animClassName,
-                    frag = $(document.createDocumentFragment());
+                    frag = $(window.document.createDocumentFragment());
                 animClassName = response.messages.length > 8 ? 
                     'chat-load' : 'chat-new';
-                items = response.messages.map(function(message) {
+                items = response.messages.map(function updateMapMessage(message) {
                     var item;
                     
                     lastKnownMessage = Math.max(
@@ -481,33 +494,33 @@
                 });
                 chatMessages.prepend(frag);
                 chatMessages.children().slice(messageLimit).remove();
-                setTimeout(function() {
+                setTimeout(function updateDeferAnim() {
                     $(items).queue(function() {
                         $(this).removeClass(animClassName);
                     });
                 }, 32);
             }
             return update(lastKnownMessage);
-        }, function(err) {
+        }, function updateErrorHandler(err) {
             // Exponential backoff from 200ms up to 10s per retry
             if (!backoff)
                 netHavingProblem(true);
             
             // Do a ping request to quickly clear error indication
             $.get('/api/wschat/message/ping')
-            .then(function() {
+            .then(function updatePingHandler() {
                 netHavingProblem(false);
-            }, function() {
+            }, function updatePingErrorHandler() {
                 netHavingProblem(true);
             });
 
             console.log('error=', err, 'backoff=', backoff);
-            setTimeout(function() {
+            setTimeout(function updateBackoffHandler() {
                 update(lastKnownMessage,
                     Math.min((backoff || 100) * 2, 10000));
             }, backoff || 0);
-        }, function(progress) {
-            console.log(progress);
+        }, function updateProgressHandler(progress) {
+            console.log('progress', progress);
         });
     }
     
@@ -709,4 +722,6 @@
     'XYZ', 'YACHTS', 'YAHOO', 'YAMAXUN', 'YANDEX', 'YE', 'YODOBASHI',
     'YOGA', 'YOKOHAMA', 'YOU', 'YOUTUBE', 'YT', 'YUN', 'ZA', 'ZAPPOS',
     'ZARA', 'ZERO', 'ZIP', 'ZM', 'ZONE', 'ZUERICH', 'ZW'
+], [
+    // emoji lookup
 ]));
