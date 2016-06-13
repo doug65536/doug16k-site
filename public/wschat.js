@@ -34,7 +34,8 @@
                 return $('<a/>', {
                     'class': 'chat-link',
                     'href': match[2],
-                    text: match[1]
+                    text: match[1],
+                    target: '_blank'
                 });
             }
         },
@@ -44,7 +45,8 @@
                 return $('<a/>', {
                     'class': 'chat-link',
                     'href': match[1],
-                    text: match[1]
+                    text: match[1],
+                    target: '_blank'
                 });
             }
         },
@@ -54,7 +56,8 @@
                 return $('<a/>', {
                     'class': 'chat-link',
                     'href': 'http://' + match[1],
-                    text: match[1]
+                    text: match[1],
+                    target: '_blank'
                 });
             }
         },
@@ -67,7 +70,8 @@
                 return $('<a/>', {
                     'class': 'chat-link',
                     'href': 'http://' + match[1],
-                    text: match[1]
+                    text: match[1],
+                    target: '_blank'
                 });
             }
         },
@@ -396,7 +400,8 @@
         return $('<a/>', {
             href: '#' + id,
             'title': String(new Date(ts)),
-            text: text
+            text: text,
+            target: '_blank'
         });
     }
     
