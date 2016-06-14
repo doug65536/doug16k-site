@@ -1,5 +1,5 @@
 @import url(https://fonts.googleapis.com/css?family=Amiri:400,400italic,700,700italic);
-
+@import url(https://fonts.googleapis.com/css?family=Arimo);
 
 .chat-fill,
 .chat-fill-width {
@@ -105,10 +105,6 @@
     margin-left: 7px;
 }
 
-.chat-message {
-    margin: 0px;
-}
-
 .chat-timestamp,
 .chat-sender {
     width: 50px;
@@ -122,18 +118,18 @@
 }
 
 .chat-text {
+    font-size: 15px;
 }
 
 .chat-footer {
     margin-top: 4px;
-    line-height: 170%;
-    padding: 2px;
 }
 
 .chat-header,
 .chat-footer {
     background-color: #CEF;
     box-sizing: border-box;
+    padding: 2px;
 }
 
 .chat-header {
@@ -149,7 +145,8 @@
 }
 
 .chat-emoji {
-    height: 1.1em;
+    height: 1.2em;    
+    vertical-align: sub;
 }
 
 .chat-flip-vertical {
@@ -181,7 +178,7 @@
     text-align: right;
     width: 132px;
     padding-right: 3px;
-    margin-left: 2px;
+    height: 18px;
 }
 
 .chat-entry {
@@ -193,11 +190,18 @@
     font-weight: bold;
 }
 
-.chat-container,
-.chat-container a,
-.chat-container input,
-.chat-container button {
+.chat-container.chat-serif,
+.chat-container.chat-serif a,
+.chat-container.chat-serif input,
+.chat-container.chat-serif button {
     font-family: Amiri;    
+}
+
+.chat-container.chat-sans,
+.chat-container.chat-sans a,
+.chat-container.chat-sans input,
+.chat-container.chat-sans button {
+    font-family: Arimo;  
 }
 
 .chat-container input:focus, 
@@ -236,6 +240,7 @@
     text-decoration: none;
 }
 
+Arimo
 
 @keyframes chat-load-anim {
     0% {

@@ -1,6 +1,7 @@
 "use strict";
 
 var cluster = require('cluster'),
+    fs = require('fs'),
     ipc = require('./cluster-ipc'),
     guidMessage = '08b9caf0-02b9-4ad4-9381-ecab048cc168',
     guidPrimeCache = '5522ba1c-b703-4104-9ad5-1c35825098c0',
@@ -36,10 +37,10 @@ function master() {
     
     ipc.masterMessageReceiver(guidMessage, function(msg, worker) {
         chatdb.insertMessage(msg)
-            .then(function(ins) {
-                msg.record = ins;
-                broadcastSender(msg);
-            });
+        .then(function(ins) {
+            msg.record = ins;
+            broadcastSender(msg);
+        });
     });
     
     ipc.masterMessageReceiver(guidUserList, function(msg, worker) {
@@ -212,6 +213,22 @@ function worker(cluster, app, jsonParser) {
     app.get('/api/wschat/unique-username', function(req, res) {
         res.send({
             username: 'user' + nextUniqueUsername++
+        });
+    });
+    
+    app.get('/api/wschat/emoji-index', function(req, res) {
+        var emojiDir = 'vendor/emojione.com/';
+        fs.readdir('public/' + emojiDir, function(err, files) {
+            var filteredFiles;
+            
+            filteredFiles = files.filter(function(name) {
+                return name.substr(-4).toUpperCase() === '.SVG';
+            });
+            
+            res.send({
+                dir: emojiDir,
+                files: filteredFiles
+            });
         });
     });
     
