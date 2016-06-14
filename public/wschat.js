@@ -15,10 +15,42 @@
         localStorage = window.localStorage,
         currentMessage = -1,
         preservedMessage,
-        messageLimit = 128;
+        messageLimit = 128,
+        emojiRequest,
+        emojiTable,
+        emojiTableReverse = {},
+        emojiIndex;
+        
+    emojiRequest = Promise.all([
+        getEmojiData(),
+        getEmojiIndex()
+    ]);
     
+    emojiTable = {
+        ':)': 0x263a,   // smile
+        ':(': 0x2639,  // frown
+        ':P': 0x1f61b,  // tongue
+        ':p': 0x1f61b,  // tongue
+        ':D': 0x1f600,  // grin
+        ':O': 0x1f62e,  // gasp
+        ';)': 0x1f609,  // wink
+        'B-)': 0x1f913, // glasses
+        'B|': 0x1f60e,  // Sunglasses
+        '>:(': 0x1f620, // angry
+        ':|': 0x1f611,  // expressionless
+        ':/': 0x1f627,  // unsure
+        ':\'(': 0x1f622, // cry
+        '(^^^)': 0x1f988,    // shark
+        '<(")': 0x1f427,      // penguin
+        ':|]': 0x1f916,       // robot
+        
+        ':canada:': [ 0x1f1e8, 0x1f1e6 ],
+        ':turkey:': [ 0x1f1f9, 0x1f1f7 ]
+    };
+
     // In priority order
-    var markupRenderTable = [
+    var markupRenderTable;
+    markupRenderTable = [
         {
             re: /(`+)(.*?)\1/,
             handler: function replaceBacktickCode(match) {
@@ -89,7 +121,8 @@
                     });
                 }
             }
-        }
+        },
+        makeEmojiHandler()
     ];
     
     $(window.document).on('hashchange', function hashchangeHandler(event) {
@@ -266,7 +299,101 @@
             event.preventDefault();
     });
     
-    update(lastKnownMessage);
+    getEmojiIndex()
+    .then(function() {
+        update(lastKnownMessage);
+    });
+    
+    function makeEmojiHandler() {
+        var obj = {
+            re: null,
+            handler: null
+        };
+        
+        emojiRequest.then(function(emojiTableResponse) {
+            var emojiTable = emojiTableResponse[0];
+            obj.re = makeEmojiRegexp(emojiTable);
+            obj.handler = function replaceEmoji(match) {
+                var emojiInput = match[1],
+                    replacement = emojiTable[emojiInput],
+                    words;
+
+                if (!replacement)
+                    return '';
+
+                if (typeof replacement === 'number')
+                    replacement = [replacement];
+
+                words = replacement.map(function(codepoint) {
+                    return codepoint.toString(16);
+                }).join('-');
+
+                return $('<img/>', {
+                    'class': 'chat-emoji',
+                    'data-chat-emoji': words,
+                    src: emojiIndex.dir + words + '.svg'
+                });
+            }
+        });
+        
+        return obj;
+    }
+    
+    function makeEmojiRegexp(emojiTable) {
+        var re;
+        re = '(' + Object.keys(emojiTable).sort(function(a, b) {
+            if (a.length < b.length)
+                return 1;
+            if (b.length < a.length)
+                return -1;
+            if (a < b)
+                return -1;
+            if (b < a)
+                return 1;
+            return 0;
+        }).map(function(key) {
+            return '(?:' + regexEscape(key) + ')';
+        }).join('|') + ')';
+        return new RegExp(re, 'i');
+    }
+    
+    function regexEscape(s) {
+        return s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    }
+ 
+    function getEmojiIndex() {
+        return $.getJSON({
+            url: '/api/wschat/emoji-index'
+        }).then(function(index) {
+            emojiIndex = index;
+        });
+    }
+    
+    function getEmojiData() {
+        return $.getJSON('vendor/emojione-data.json').then(function(data) {
+            return Object.keys(data).map(function(key) {
+                return this[key];
+            }, data);
+        }).then(function(emojies) {
+            return emojies.reduce(function(result, emoji) {
+                var unicode = emoji.unicode.split(/-/).map(function(f) {
+                    return parseInt(f, 16);
+                });
+                
+                if (emoji.shortname)
+                    result[emoji.shortname] = unicode;
+                
+                emoji.aliases_ascii.forEach(function(alias) {
+                    this[alias] = unicode;
+                }, result);
+                
+                return result;
+            }, {});
+        }).then(function(lookup) {
+            emojiTable = lookup;
+            return lookup;
+        });
+    }
     
     function handleHash() {
         
@@ -436,7 +563,8 @@
                 if (after)
                     result.splice(index, 0, after);
                 
-                result.splice(index, 0, replacement);
+                if (replacement)
+                    result.splice(index, 0, replacement);
                 
                 // If there was text after
                 if (before)
