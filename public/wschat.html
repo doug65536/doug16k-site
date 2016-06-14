@@ -1,52 +1,71 @@
-<div class="chat-component">
-    <div class="chat-header">
-        <span>Username:</span>
-        <input class="chat-username">
+<div class="chat-container chat-flex chat-row chat-fixed chat-fill">
+    <div class="chat-flex chat-column chat-grow">
+        <div class="chat-header chat-flex chat-clip chat-noshrink">
+            <div>Room:&nbsp;</div>
+            <div class="chat-flex chat-grow">Prototype room</div>
+            <button>change room</button>
+        </div>
+        <div class="chat-messages chat-message-scroll chat-grow chat-scrollable chat-flip-vertical">
+            <div class="chat-message chat-flex chat-flip-vertical">
+                <div class="chat-timestamp chat-noshrink"></div>
+                <div class="chat-sender chat-noshrink"></div>
+                <div class="chat-text chat-grow"></div>
+                <div class="chat-star chat-noshrink">
+                    <span title="Click to add or remove star">&#x2605;</span>
+                </div>
+            </div>
+        </div>
+        <div class="chat-footer chat-flex chat-noshrink">
+            <div class=""><input class="chat-username"></div>
+            <input class="chat-entry chat-grow">
+            <button class="chat-send">&#x21b5; Send</button>
+            <button class="chat-add-emoji">
+                <img class="chat-emoji" src="vendor/emojione.com/1f642.svg">
+            </button>
+        </div>
+        <div class="chat-problem chat-hidden">Network problem</div>
     </div>
-    <div class="chat-messages">
-        <div class="chat-message">
-            <div class="chat-time"></div>
-            <div class="chat-sender"></div>
-            <div class="chat-text"></div>
+    <div class="chat-flex chat-column chat-sidebar">
+        <div class="chat-joined-rooms-list chat-scrollable">
+            joined
+        </div>
+        <div class="chat-grow chat-active-list chat-scrollable">
+            <ul><li>A</li><li>B</li><li>C</li><li>D</li></ul>
+        </div>
+        <div class="chat-stars-list">
+            stars
         </div>
     </div>
-    <div class="chat-footer">
-        <span class="username-display"></span>
-        <input class="chat-entry">
-    </div>
-    <div class="chat-sidebar">
-        <ul>
-            <li><a target="_blank" href="https://github.com">github.com</a></li>
-            <li><a target="_blank" href="https://gist.github.com">gist.github.com</a></li>
-            <li><a target="_blank" href="https://bitbucket.com">bitbucket.com</a></li>
-            <li><a target="_blank" href="http://jstraight.com">jstraight.com</a></li>
-            <li><a target="_blank" href="http://jsfiddle.net">jsfiddle.net</a></li>
-            <li><a target="_blank" href="http://coliru.stacked-crooked.com">coliru</a></li>
-            <li><a target="_blank" href="https://regex101.com/">regex101.com</a></li>
-            <li><a target="_blank" href="https://google.com/">google.com</a></li>
-            <li><a target="_blank" href="http://cppreference.com/">cppreference.com</a></li>
-            <li><a target="_blank" href="https://developer.mozilla.org/en-US/docs/Web/javascript">JS @ MDN</a></li>
-            <li><a target="_blank" href="https://developer.mozilla.org/en-US/docs/Web/CSS">CSS @ MDN</a></li>
-            <li><a target="_blank" href="https://developer.mozilla.org/en-US/docs/Web/SVG">SVG @ MDN</a></li>
-            <li><a target="_blank" href="https://developer.mozilla.org/en-US/docs/Web/HTML">HTML @ MDN</a></li>
-            <li><a target="_blank" href="http://caniuse.com/">Can I Use?</a></li>
-            <li><a target="_blank" href="https://www.postgresql.org/docs/9.5/static/index.html">Postgresql 9.5</a></li>
-            <li><a target="_blank" href="http://www.wolframalpha.com/">Wolfram Alpha</a></li>
-            <li><a target="_blank" href="https://nodejs.org/dist/latest-v4.x/docs/api/">NodeJS 4.x</a></li>
-            <li><a target="_blank" href="https://nodejs.org/dist/latest-v6.x/docs/api/">NodeJS 6.x</a></li>
-            <li><a target="_blank" href="http://expressjs.com/en/4x/api.html">Express 4.x</a></li>
-            
-            <li><a target="_blank" href="http://docs.sequelizejs.com/en/latest/">Sequelize</a></li>
-            <li><a target="_blank" href="http://api.jquery.com/">jQuery</a>
-            <li><a target="_blank" href="http://www.james.padolsey.com/jquery/">jQuery Source</a>
-            <li><a target="_blank" href="http://stackoverflow.com">StackOverflow</a></li>
-            <li><a target="_blank" href="http://www.pasteall.org/pic/">PasteAll Image</a></li>
-            <li><a target="_blank" href="http://downforeveryoneorjustme.com/">Site Down?</a></li>
-            <li><a target="_blank" href="https://www.youtube.com/">YouTube</a></li>
-            <li><a target="_blank" href="http://www.rfcreader.com/">RFC Reader</a></li>
-        </ul>
-    </div>
-    <div class="chat-problem hidden">Network problem</div>
 </div>
+<!--ul>
+    <li><a target="_blank" href="https://github.com">github.com</a></li>
+    <li><a target="_blank" href="https://gist.github.com">gist.github.com</a></li>
+    <li><a target="_blank" href="https://bitbucket.com">bitbucket.com</a></li>
+    <li><a target="_blank" href="http://jstraight.com">jstraight.com</a></li>
+    <li><a target="_blank" href="http://jsfiddle.net">jsfiddle.net</a></li>
+    <li><a target="_blank" href="http://coliru.stacked-crooked.com">coliru</a></li>
+    <li><a target="_blank" href="https://regex101.com/">regex101.com</a></li>
+    <li><a target="_blank" href="https://google.com/">google.com</a></li>
+    <li><a target="_blank" href="http://cppreference.com/">cppreference.com</a></li>
+    <li><a target="_blank" href="https://developer.mozilla.org/en-US/docs/Web/javascript">JS @ MDN</a></li>
+    <li><a target="_blank" href="https://developer.mozilla.org/en-US/docs/Web/CSS">CSS @ MDN</a></li>
+    <li><a target="_blank" href="https://developer.mozilla.org/en-US/docs/Web/SVG">SVG @ MDN</a></li>
+    <li><a target="_blank" href="https://developer.mozilla.org/en-US/docs/Web/HTML">HTML @ MDN</a></li>
+    <li><a target="_blank" href="http://caniuse.com/">Can I Use?</a></li>
+    <li><a target="_blank" href="https://www.postgresql.org/docs/9.5/static/index.html">Postgresql 9.5</a></li>
+    <li><a target="_blank" href="http://www.wolframalpha.com/">Wolfram Alpha</a></li>
+    <li><a target="_blank" href="https://nodejs.org/dist/latest-v4.x/docs/api/">NodeJS 4.x</a></li>
+    <li><a target="_blank" href="https://nodejs.org/dist/latest-v6.x/docs/api/">NodeJS 6.x</a></li>
+    <li><a target="_blank" href="http://expressjs.com/en/4x/api.html">Express 4.x</a></li>
+
+    <li><a target="_blank" href="http://docs.sequelizejs.com/en/latest/">Sequelize</a></li>
+    <li><a target="_blank" href="http://api.jquery.com/">jQuery</a>
+    <li><a target="_blank" href="http://www.james.padolsey.com/jquery/">jQuery Source</a>
+    <li><a target="_blank" href="http://stackoverflow.com">StackOverflow</a></li>
+    <li><a target="_blank" href="http://www.pasteall.org/pic/">PasteAll Image</a></li>
+    <li><a target="_blank" href="http://downforeveryoneorjustme.com/">Site Down?</a></li>
+    <li><a target="_blank" href="https://www.youtube.com/">YouTube</a></li>
+    <li><a target="_blank" href="http://www.rfcreader.com/">RFC Reader</a></li>
+</ul-->
 <script src="vendor/promise.js"></script>
 <script src="vendor/jquery-2.2.4.min.js"></script>

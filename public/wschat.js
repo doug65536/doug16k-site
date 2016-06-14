@@ -3,14 +3,13 @@
     
     var chatUsername = $('.chat-username'),
         chatMessages = $('.chat-messages'),
-        chatUsername = $('.chat-username'),
         problemIndicator = $('.chat-problem'),
         username,
         chatEntry = $('.chat-entry'),
         chatMessage = $('.chat-message').remove(),
         chatSender = chatMessage.find('.chat-sender'),
         chatText = chatMessage.find('.chat-text'),
-        chatTime = chatMessage.find('.chat-time'),
+        chatTime = chatMessage.find('.chat-timestamp'),
         lastKnownMessage = -1,
         localStorage = window.localStorage,
         currentMessage = -1,
@@ -302,6 +301,8 @@
     getEmojiIndex()
     .then(function() {
         update(lastKnownMessage);
+    }).then(function() {
+        chatEntry.focus();
     });
     
     function makeEmojiHandler() {
@@ -310,7 +311,7 @@
             handler: null
         };
         
-        emojiRequest.then(function(emojiTableResponse) {
+        emojiRequest = emojiRequest.then(function(emojiTableResponse) {
             var emojiTable = emojiTableResponse[0];
             obj.re = makeEmojiRegexp(emojiTable);
             obj.handler = function replaceEmoji(match) {
@@ -331,9 +332,12 @@
                 return $('<img/>', {
                     'class': 'chat-emoji',
                     'data-chat-emoji': words,
+                    title: emojiInput,
                     src: emojiIndex.dir + words + '.svg'
                 });
-            }
+            };
+            
+            return emojiTableResponse;
         });
         
         return obj;
@@ -477,11 +481,10 @@
             'data-sender': data.sender,
             'data-timestamp': timestamp,
             'data-message': data.message,
-            'id': id,
-            'class': data.sender === username
-                ? 'chat-message chat-message-own'
-                : 'chat-message chat-message-not-own'
+            'id': id
         });
+        chatMessage.toggleClass('chat-message-own', data.sender === username);
+        chatMessage.toggleClass('chat-message-not-own', data.sender !== username);
 
         chatTime.empty().append(renderTimestamp(id, timestamp));
 
@@ -613,7 +616,7 @@
                     animClassName,
                     frag = $(window.document.createDocumentFragment());
                 animClassName = response.messages.length > 8 ? 
-                    'chat-load' : 'chat-new';
+                    'chat-load' : 'chat-reveal';
                 items = response.messages.map(function updateMapMessage(message) {
                     var item;
                     
@@ -627,11 +630,6 @@
                 });
                 chatMessages.prepend(frag);
                 chatMessages.children().slice(messageLimit).remove();
-                setTimeout(function updateDeferAnim() {
-                    $(items).queue(function() {
-                        $(this).removeClass(animClassName);
-                    });
-                }, 32);
             }
             return update(lastKnownMessage);
         }, function updateErrorHandler(err) {
