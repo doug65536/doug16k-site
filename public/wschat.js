@@ -1,11 +1,20 @@
 (function loadWSChat(window, $, tldLookup, emojiLookup) {
     "use strict";
     
-    var chatUsername = $('.chat-username'),
+    var chatContainer = $('.chat-container'),
+        chatUsername = $('.chat-username'),
         chatMessages = $('.chat-messages'),
+        chatFooter = $('.chat-footer'),
+        chatDynamicStyle = $('<style/>').appendTo('head'),
         problemIndicator = $('.chat-problem'),
+        chatDesktopNotificationPane = $('.chat-desktop-notification-pane'),
+        chatDesktopNotification = $('.chat-desktop-notification'),
         username,
+        changeRoom = $('.chat-change-room'),
+        changeSettings = $('.chat-change-settings'),
         chatEntry = $('.chat-entry'),
+        chatSend = $('.chat-send'),
+        chatPickEmoji = $('.chat-pick-emoji'),
         chatMessage = $('.chat-message').remove(),
         chatSender = chatMessage.find('.chat-sender'),
         chatText = chatMessage.find('.chat-text'),
@@ -15,38 +24,9 @@
         currentMessage = -1,
         preservedMessage,
         messageLimit = 128,
-        emojiRequest,
-        emojiTable,
-        emojiTableReverse = {},
-        emojiIndex;
-        
-    emojiRequest = Promise.all([
-        getEmojiData(),
-        getEmojiIndex()
-    ]);
+        emojiRequest = getEmojiData(),
+        emojiUI;
     
-    emojiTable = {
-        ':)': 0x263a,   // smile
-        ':(': 0x2639,  // frown
-        ':P': 0x1f61b,  // tongue
-        ':p': 0x1f61b,  // tongue
-        ':D': 0x1f600,  // grin
-        ':O': 0x1f62e,  // gasp
-        ';)': 0x1f609,  // wink
-        'B-)': 0x1f913, // glasses
-        'B|': 0x1f60e,  // Sunglasses
-        '>:(': 0x1f620, // angry
-        ':|': 0x1f611,  // expressionless
-        ':/': 0x1f627,  // unsure
-        ':\'(': 0x1f622, // cry
-        '(^^^)': 0x1f988,    // shark
-        '<(")': 0x1f427,      // penguin
-        ':|]': 0x1f916,       // robot
-        
-        ':canada:': [ 0x1f1e8, 0x1f1e6 ],
-        ':turkey:': [ 0x1f1f9, 0x1f1f7 ]
-    };
-
     // In priority order
     var markupRenderTable;
     markupRenderTable = [
@@ -135,6 +115,8 @@
             setUsername(username);
     }
     
+    chatPickEmoji.on('click', showEmojiUI);
+    
     chatUsername.on('input change', function usernameChangeHandler(event) {
         username = chatUsername.val();
         chatText.prop('disabled', 
@@ -143,24 +125,27 @@
         if (localStorage)
             localStorage.setItem('username', username);
     });
-        
+    
     if (!username)
         assignUsername();
     
-    chatEntry.on('keypress', function chatKeypressHandler(event) {
-        var message = chatEntry.val();
+    changeSettings.on('click', function(event) {
+        chatContainer.toggleClass('chat-serif chat-sans');
+    });
+    
+    chatSend.on('click', function(event) {
+        sendCurrentMessage();
+    });
+    
+    chatEntry.on('input keypress', function chatKeypressHandler(event) {
+        if (event.type === 'input') {
+            chatSend.prop('disabled', isCurrentMessageEmpty());
+            return;
+        }
+        
         switch (event.which) {
         case 13:
-            chatEntry.prop('disabled', true);
-            sendMessage(username, message)
-            .then(function() {
-                // Clear the field
-                chatEntry.val('');
-                chatEntry.prop('disabled', false).focus();
-            }, function(err) {
-                // Leave unsent value in the field
-                chatEntry.prop('disabled', false).focus();
-            });
+            sendCurrentMessage();
             break;
         }
     }).on('keydown', function chatKeydownHandler(event) {
@@ -171,9 +156,9 @@
             text;
         
         switch (event.which) {
-        case 38:
-        case 40:
-        case 27:
+        case 38:    // up
+        case 40:    // down
+        case 27:    // esc
             // Direction of message index change
             dir = event.which === 38 ? 1 : 
                 event.which === 40 ? -1 : 0;
@@ -200,11 +185,6 @@
             // If pressing up from new chat message, save it
             if (dir > 0 && currentMessage < 0)
                 preservedMessage = chatEntry.val();
-            
-            if (messages.selectedIndex === 
-                messages.all.length - 1 && dir < 0) {
-                
-            }
 
             if (currentMessage < 0) {
                 message = messages.all.first();
@@ -226,6 +206,13 @@
                 currentMessage = -1;
                 preservedMessage = '';
             }
+            break;
+        
+        case 33:
+        case 34:
+            dir = event.which === 33 ? 1 : -1;
+            chatMessages.scrollTop(chatMessages.scrollTop() +
+                dir * chatMessages.innerHeight * 0.95);
             break;
             
         }
@@ -298,12 +285,98 @@
             event.preventDefault();
     });
     
-    getEmojiIndex()
-    .then(function() {
+    chatFooter.on('click', '.chat-emoji', function(event) {
+        var clicked = $(event.target).closest('.chat-emoji'),
+            sel = window.getSelection && window.getSelection(),
+            range = sel.rangeCount && sel.getRangeAt(0),
+            ins,
+            str;
+        if (!clicked.length)
+            return;
+        
+        if (range && chatEntry.is(range.startContainer) && 
+            chatEntry.is(range.endContainer)) {
+            str = chatEntry.val();
+            str = str.substr(0, range.startOffset) +
+                ins +
+                str.substr(range.endOffset);
+            chatEntry.val(str);
+            range.collapse();
+        }
+    });
+
+    emojiRequest
+    .then(function(emojies) {
         update(lastKnownMessage);
     }).then(function() {
         chatEntry.focus();
     });
+    
+    chatDesktopNotification.on('click', function(event) {
+        enableNotification(chatDesktopNotification.prop('checked'));
+    });
+    
+    function enableNotification(enable) {
+        var n;
+        
+        if (window.webkitNotifications) {
+            if (window.webkitNotifications.checkPermission() === 0) {
+                // 0 is PERMISSION_ALLOWED
+                n = window.webkitNotifications.createNotification(
+                    'vendor/emojione.com/1f642.svg', 
+                    'Notification Title', 
+                    'Notification content...');
+                //n.ondisplay = function() {};
+                //n.onclose = function() {};
+                
+                n.show();
+            } else if (enable) {
+                window.webkitNotifications.requestPermission();
+            }
+        }
+    }
+    
+    function sortByProps() {
+        var props = Array.prototype.slice.call(arguments);
+        
+        return function(a, b) {
+            var result = 0;
+            
+            props.some(function(prop) {
+                var av = a[prop],
+                    bv = b[prop];
+                
+                if (av < bv)
+                    result = -1;
+                else if (bv < av)
+                    result = 1;
+                
+                return result !== 0;
+            });
+            
+            return result;
+        };
+    }
+    
+    function isCurrentMessageEmpty() {
+        return $.trim(chatEntry.val()).length === 0;
+    }
+
+    function sendCurrentMessage() {
+        var message = chatEntry.val();
+        if (!$.trim(message))
+            return false;
+        chatEntry.prop('disabled', true);
+        sendMessage(username, message)
+        .then(function() {
+            // Clear the field
+            chatEntry.val('');
+            chatEntry.prop('disabled', false).focus();
+        }, function(err) {
+            // Leave unsent value in the field
+            chatEntry.prop('disabled', false).focus();
+        });
+    }
     
     function makeEmojiHandler() {
         var obj = {
@@ -311,9 +384,9 @@
             handler: null
         };
         
-        emojiRequest = emojiRequest.then(function(emojiTableResponse) {
-            var emojiTable = emojiTableResponse[0];
-            obj.re = makeEmojiRegexp(emojiTable);
+        emojiRequest.then(function(emojies) {
+            var emojiTable = emojies.index;
+            obj.re = makeEmojiRegexp(emojies);
             obj.handler = function replaceEmoji(match) {
                 var emojiInput = match[1],
                     replacement = emojiTable[emojiInput],
@@ -333,19 +406,17 @@
                     'class': 'chat-emoji',
                     'data-chat-emoji': words,
                     title: emojiInput,
-                    src: emojiIndex.dir + words + '.svg'
+                    src: emojies.files.dir + words + '.svg'
                 });
             };
-            
-            return emojiTableResponse;
         });
         
         return obj;
     }
     
-    function makeEmojiRegexp(emojiTable) {
+    function makeEmojiRegexp(emojies) {
         var re;
-        re = '(' + Object.keys(emojiTable).sort(function(a, b) {
+        re = '(' + Object.keys(emojies.index).sort(function(a, b) {
             if (a.length < b.length)
                 return 1;
             if (b.length < a.length)
@@ -368,18 +439,26 @@
     function getEmojiIndex() {
         return $.getJSON({
             url: '/api/wschat/emoji-index'
-        }).then(function(index) {
-            emojiIndex = index;
         });
     }
     
     function getEmojiData() {
         return $.getJSON('vendor/emojione-data.json').then(function(data) {
-            return Object.keys(data).map(function(key) {
+            var emojies = {
+                list: null,
+                index: null,
+                files: null
+            };
+            
+            emojies.list = Object.keys(data).filter(function(key) {
+                return this[key].category !== 'modifier';
+            }, data).map(function(key) {
                 return this[key];
-            }, data);
+            }, data).sort(sortByProps('category', 'name'));
+            
+            return emojies;
         }).then(function(emojies) {
-            return emojies.reduce(function(result, emoji) {
+            emojies.index = emojies.list.reduce(function(result, emoji) {
                 var unicode = emoji.unicode.split(/-/).map(function(f) {
                     return parseInt(f, 16);
                 });
@@ -393,12 +472,226 @@
                 
                 return result;
             }, {});
-        }).then(function(lookup) {
-            emojiTable = lookup;
-            return lookup;
+            
+            return emojies;
+        }).then(function(emojies) {
+            var deferred = $.Deferred();
+            
+            getEmojiIndex().then(function(files) {
+                emojies.files = files;
+                deferred.resolve(emojies);
+            });
+            
+            return deferred.promise();
         });
     }
     
+    function upsertList(obj, prop) {
+        return obj[prop] || (obj[prop] = []);
+    }
+    
+    function upsertItem(obj, prop) {
+        var list = obj[prop] || (obj[prop] = []);
+        Array.prototype.push.apply(list,
+            Array.prototype.slice.call(arguments, 2));
+        return obj;
+    }
+    
+    function showEmojiUI(event) {
+        if (emojiUI) {
+            emojiUI.toggle();
+            return;
+        }
+        
+        emojiRequest.then(function(emojies) {
+            var categoryList,
+                byCategory,
+                catList;
+        
+            $(document).on('focusin', function(event) {
+                var target = $(event.target);
+                if (emojiUI && !target.closest(emojiUI).length)
+                    emojiUI.hide();
+            });
+            
+            byCategory = emojies.list.reduce(function(categories, emoji) {
+                return upsertItem(categories, emoji.category, emoji);
+            }, {});
+            
+            // Top level text menu
+            categoryList = $('<ul/>', {
+                'class': 'chat-popup chat-dynamic-menuheight'
+            });
+            
+            // Make an item for each category
+            Object.keys(byCategory).sort().forEach(function(key) {
+                var list = this[key],
+                    title,
+                    catListItem,
+                    submenu;
+                
+                catListItem = $('<li/>', {
+                    'class': 'chat-popup-menuitem',
+                    appendTo: categoryList
+                });
+                
+                title = $('<span/>', {
+                    'class': 'chat-popup-text',
+                    appendTo: catListItem,
+                    text: key
+                });
+                
+                catListItem.hover(function(event) {
+                    updateMenuLimits(event, catListItem);
+                    
+                    if (!submenu)
+                        buildMenu();
+                    else
+                        submenu.removeClass('chat-pending-remove');
+                    
+                    submenu.insertAfter(title);
+                }, function(event) {
+                    if (submenu.hasClass('chat-pending')) {
+                        submenu.addClass('chat-pending-remove');
+                    } else {
+                        submenu.detach();
+                    }
+                });
+                
+                function buildMenu() {
+                    var overlay,
+                        expectedImages = [],
+                        timeout,
+                        progressTimeout,
+                        frac = 0,
+                        lastCompletion = 0;
+                    
+                    submenu = $('<div/>', {
+                        'class': [
+                            'chat-popup-menu',
+                            'chat-popup-loading',
+                            'chat-pending',
+                            'chat-dynamic-popup'
+                        ].join(' ')
+                    });
+
+                    list.forEach(function(emoji) {
+                        var li,
+                            img;
+
+                        img = $('<img/>', {
+                            'class': 'chat-emoji',
+                            title: emoji.shortname,
+                            src: emojies.files.dir + emoji.unicode + '.svg',
+                        });
+                        
+                        expectedImages.push(img.get(0));
+
+                        img.on('load error', loadHandler);
+
+                        img.appendTo(submenu);
+                    });
+
+                    // Last so it is on top of everything
+                    overlay = $('<div/>', {
+                        'class': 'chat-fill chat-overlay',
+                        appendTo: submenu,
+                        text: 'Loading...'
+                    });
+                    
+                    timeout = setTimeout(function timeoutAgain() {
+                        // If an image finished within 10 seconds of now,
+                        if (Date.now() - lastCompletion < 10000) {
+                            // Extend the timeout
+                            timeout = setTimeout(timeoutAgain, 10000);
+                            console.log('emoji load grace period');
+                            return;
+                        }
+                        
+                        timeout = undefined;
+                        
+                        expectedImages.forEach(function(img) {
+                            console.error('timed out failed: ' + img.src);
+                        });
+                        
+                        $(expectedImages).off('load error', loadHandler);
+                        
+                        doneHandler();
+                    }, 10000);
+                    
+                    progressTimeout = setTimeout(function emojiProgressAgain() {
+                        overlay.text('Loading...' + frac + '%');
+                        
+                        progressTimeout = setTimeout(emojiProgressAgain, 1000);
+                    }, 1000);
+                    
+                    function loadHandler(event) {
+                        var index = expectedImages.indexOf(this),
+                            done;
+                        
+                        lastCompletion = Date.now();
+                        
+                        if (index >= 0)
+                            expectedImages.splice(index, 1);
+                        else
+                            console.log('weird unexpected load event');
+                        
+                        done = list.length - expectedImages.length;
+                        frac = (list.length && 
+                            (100 * done / list.length) || 0).toFixed(0);
+                        
+                        if (expectedImages.length === 0)
+                            doneHandler();
+                    }
+                    
+                    function doneHandler() {
+                        if (timeout) {
+                            clearTimeout(timeout);
+                            timeout = undefined;
+                        }
+                        if (progressTimeout) {
+                            clearTimeout(progressTimeout);
+                            progressTimeout = undefined;
+                        }
+                        submenu.addClass('chat-load-finished');
+                        overlay.fadeOut().queue(function() {
+                            overlay.remove();
+                            overlay = undefined;
+                        });
+                        
+                        if (submenu.hasClass('chat-pending-remove')) {
+                            submenu.removeClass('chat-pending-remove');
+                            submenu.detach();
+                        }
+                    }
+                }
+                
+            }, byCategory);
+            
+            emojiUI = categoryList;
+            categoryList.insertBefore(chatPickEmoji);
+        });
+    }
+    
+    function updateMenuLimits(event, catListItem) {
+        var ofsItem = catListItem.offset(),
+            ofsMessages = chatMessages.offset(),
+            width = (ofsItem.left - ofsMessages.left - 8),
+            height = ofsItem.top - ofsMessages.top - 8,
+            ofsButton = chatPickEmoji.offset(),
+            menuHeight = ofsButton.top - ofsMessages.top - 8,
+            source;
+
+        source = '.chat-dynamic-popup {' +
+            'width: ' + width + 'px; ' +
+            'max-height: ' + height + 'px; }\n' +
+            '.chat-dynamic-menuheight {' +
+            'max-height: ' + menuHeight + 'px;' +
+            '}';
+
+        chatDynamicStyle.text(source);
+    }
+
     function handleHash() {
         
     }
@@ -626,6 +919,14 @@
                     item = createMessageIndirect(message);
                     item.addClass(animClassName);
                     frag.prepend(item);
+                    
+                    if (window.Notification && 
+                        message.message.indexOf('@' + username) >= 0) {
+                        new Notification('doug16k.com chat', {
+                            body: message.sender + ' mentioned you'
+                        });
+                    }
+                    
                     return item.get(0);
                 });
                 chatMessages.prepend(frag);
@@ -657,6 +958,10 @@
     
     function netHavingProblem(problem) {
         problemIndicator.toggleClass('hidden', !problem);
+    }
+    
+    function categorizeEmojies() {
+        emojiIndex
     }
 }(window, jQuery, [
     // http://data.iana.org/TLD/tlds-alpha-by-domain.txt

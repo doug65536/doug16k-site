@@ -1,6 +1,10 @@
 @import url(https://fonts.googleapis.com/css?family=Amiri:400,400italic,700,700italic);
 @import url(https://fonts.googleapis.com/css?family=Arimo);
 
+.chat-fill {
+    position: absolute;
+}
+
 .chat-fill,
 .chat-fill-width {
     left: 0;
@@ -11,6 +15,10 @@
 .chat-fill-height {
     top: 0;
     bottom: 0;
+}
+
+.chat-red {
+    background-color: red;
 }
 
 .chat-clip {
@@ -95,6 +103,10 @@
     margin: 5px 0px;
 }
 
+.chat-container.chat-sans .chat-message {
+    margin-bottom: 6px;
+}
+
 .chat-timestamp,
 .chat-sender,
 .chat-text {
@@ -169,6 +181,11 @@
     animation: chat-reveal-anim 0.5s ease-out;
 }
 
+.chat-reveal .chat-timestamp,
+.chat-reveal .chat-sender {
+    animation: chat-new-highlight 4.266s linear;
+}
+
 .chat-load {
     animation: chat-load-anim 0.5s ease-out;
 }
@@ -201,7 +218,7 @@
 .chat-container.chat-sans a,
 .chat-container.chat-sans input,
 .chat-container.chat-sans button {
-    font-family: Arimo;  
+    font-family: Arimo;
 }
 
 .chat-container input:focus, 
@@ -216,8 +233,66 @@
     cursor: pointer;
 }
 
+.chat-editing {
+    background-color: #EE4;
+}
+
 .chat-starred .chat-star {
     color: #FF0;
+}
+
+.chat-popup {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.9);
+    bottom: 100%;
+    right: 20px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border: solid black 1px;
+    cursor: default;
+}
+
+.chat-popup-menuitem {
+    position: relative;
+}
+
+.chat-popup-menu {
+    right: 100%;
+    flex-flow: row-reverse wrap;
+    position: absolute;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    width: 800px;
+    padding: 3px;
+    border: solid black 1px;
+}
+
+.chat-popup-menuitem {
+    position: relative;
+    padding: 3px;
+    text-align: left;
+}
+
+.chat-popup-menuitem:hover,
+.chat-popup-menuitem.chat-holdopen,
+.chat-popup-menuitem img:hover {
+    background-color: #CEF;
+}
+
+.chat-popup-menuitem img {
+    padding: 3px;
+    height: 27px;
+    width: 27px;
+}
+
+.chat-popup-menuitem .chat-popup-menu {
+    display: none;
+}
+
+.chat-popup-menuitem.chat-holdopen .chat-popup-menu,
+.chat-popup-menuitem:hover .chat-popup-menu {
+    display: flex;
 }
 
 @keyframes chat-reveal-anim {
@@ -240,7 +315,18 @@
     text-decoration: none;
 }
 
-Arimo
+.chat-desktop-notification-pane {
+    text-align: right;
+}
+
+.chat-overlay {
+    display: flex;
+    flex-flow: column-reverse nowrap;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.95);
+    vertical-align: middle;
+    text-align: center;
+}
 
 @keyframes chat-load-anim {
     0% {
@@ -248,5 +334,20 @@ Arimo
     }
     100% {
         opacity: 1;
+    }
+}
+
+@keyframes chat-new-highlight {
+    0% {
+        background-color: #FFF;
+    }
+    20% {
+        background-color: #CEF;
+    }
+    90% {
+        background-color: #CEF;
+    }
+    100% {
+        background-color: #FFF;
     }
 }

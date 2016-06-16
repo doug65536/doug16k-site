@@ -4,8 +4,9 @@
             <div>Room:&nbsp;</div>
             <div class="chat-flex chat-grow">Prototype room</div>
             <button>change room</button>
-            <button>settings</button>
+            <button class="chat-change-settings">settings</button>
         </div>
+        
         <div class="chat-messages chat-message-scroll chat-grow chat-scrollable chat-flip-vertical">
             <div class="chat-message chat-flex chat-flip-vertical">
                 <div class="chat-timestamp chat-noshrink"></div>
@@ -20,13 +21,19 @@
             <div class=""><input class="chat-username"></div>
             <input class="chat-entry chat-grow">
             <button class="chat-send">&#x21b5; Send</button>
-            <button class="chat-add-emoji">
-                <img class="chat-emoji" src="vendor/emojione.com/1f642.svg">
+            <button class="chat-add-emoji chat-pick-emoji">
+                <img src="vendor/emojione.com/1f642.svg">
             </button>
         </div>
         <div class="chat-problem chat-hidden">Network problem</div>
     </div>
     <div class="chat-flex chat-column chat-sidebar">
+        <div class="chat-desktop-notification-pane">
+            <label title="Show desktop notification">
+                <input type="checkbox" class="chat-desktop-notification">
+                Notifications
+            </label>
+        </div>
         <div class="chat-joined-rooms-list chat-scrollable">
             joined
         </div>
