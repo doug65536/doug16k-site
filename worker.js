@@ -6,7 +6,8 @@ var cluster = require('cluster'),
     ipc = require('./cluster-ipc'),
     guid = '683123cc-8214-44a1-a456-aa5c544698ca',
     appModules = [
-        require('./chatserver')
+        require('./chatserver'),
+        require('./auth')
     ],
     dhparam,
     crypto;

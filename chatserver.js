@@ -2,6 +2,7 @@
 
 var cluster = require('cluster'),
     fs = require('fs'),
+    path = require('path'),
     ipc = require('./cluster-ipc'),
     guidMessage = '08b9caf0-02b9-4ad4-9381-ecab048cc168',
     guidPrimeCache = '5522ba1c-b703-4104-9ad5-1c35825098c0',
@@ -39,6 +40,10 @@ function master() {
         chatdb.insertMessage(msg)
         .then(function(ins) {
             msg.record = ins;
+            broadcastSender(msg);
+        }, function(err) {
+            console.log('chat message insert error!', err);
+            msg.error = err;
             broadcastSender(msg);
         });
     });
@@ -78,7 +83,9 @@ function worker(cluster, app, jsonParser) {
         nextUniqueUsername = Date.now() - 1464414604408,
         userListRequests = {},
         userListRequestNextId = 1,
-        requestUserList = ipc.makeWorkerSender(guidUserList);
+        requestUserList = ipc.makeWorkerSender(guidUserList),
+        emojiPackage,
+        emojiPackageTimeout;
     
     ipc.workerReceiver(guidUserList, function(msg) {
         var entry = userListRequests[msg.userListRequestId];
@@ -89,12 +96,14 @@ function worker(cluster, app, jsonParser) {
     });
     
     ipc.workerReceiver(guidMessage, function(msg) {
-        appendRecord(msg.record);
+        if (msg.record)
+            appendRecord(msg.record);
         serviceWaitQueue();
     });
     
     // Prime message cache
     ipc.workerReceiver(guidPrimeCache, function(msg) {
+        console.log('primecache received', msg.records.length);
         msg.records.sort(function(a, b) {
             var na = +a.id,
                 nb = +b.id;
@@ -139,13 +148,17 @@ function worker(cluster, app, jsonParser) {
             lastMessage = messages && messages[messages.length-1],
             waiter,
             hint;
-        console.log('since=', since);
+        
+        console.log('incoming since', since);
+        
         if (since < 0 && firstMessage)
-            since = firstMessage.id;
+            since = +firstMessage.id;
+        
+        console.log('since=', typeof since, since);
         
         if (since !== undefined && 
                 lastMessage &&
-                lastMessage.id > since) {
+                +lastMessage.id > since) {
             // Send response immediately
             sendMessagesSince(res, since, defaultLimit);
             return;
@@ -189,8 +202,7 @@ function worker(cluster, app, jsonParser) {
     });
 
     app.post('/api/wschat/message/stream', jsonParser, function(req, res) {
-        var recipients,
-            sender = req.body.sender,
+        var sender = req.body.sender,
             message = req.body.message,
             record;
 
@@ -204,8 +216,6 @@ function worker(cluster, app, jsonParser) {
         sendMessageToMaster({
             record: record
         });
-        
-        recipients = waitQueue.length;
 
         res.send({});
     });
@@ -216,9 +226,11 @@ function worker(cluster, app, jsonParser) {
         });
     });
     
+    var emojiDirPrefix = 'public/',
+        emojiDir = 'vendor/emojione.com/';
+    
     app.get('/api/wschat/emoji-index', function(req, res) {
-        var emojiDir = 'vendor/emojione.com/';
-        fs.readdir('public/' + emojiDir, function(err, files) {
+        fs.readdir(emojiDirPrefix + emojiDir, function(err, files) {
             var filteredFiles;
             
             filteredFiles = files.filter(function(name) {
@@ -231,6 +243,59 @@ function worker(cluster, app, jsonParser) {
             });
         });
     });
+    
+    app.get('/api/wschat/emoji-package', function(req, res) {
+        if (!emojiPackage) {
+            emojiPackage = (new Promise(function(resolve, reject) {
+                fs.readdir(emojiDirPrefix + emojiDir, function(err, files) {
+                    if (!err)
+                        resolve(files);
+                    else
+                        reject(err);
+                });
+            })).then(function(files) {
+                return allFileContent(emojiDirPrefix, files);
+            });
+        }
+            
+        if (emojiPackageTimeout)
+            clearTimeout(emojiPackageTimeout);
+        emojiPackageTimeout = setTimeout(function() {
+            emojiPackage = null;
+        }, 1800000);    // 1800000 = 30 minutes
+        
+        emojiPackage.then(function(pakage) {
+            res.send(pakage);
+        });
+    });
+    
+    function allFileContent(prefix, files) {
+        var index = 0,
+            result = {};
+        
+        return new Promise(function again(resolve, reject) {
+            var name = files[index++],
+                basename = path.basename(name),
+                fullname = prefix + emojiDir + name;
+            console.log('allFileContent:reading:', fullname);
+            fs.readFile(fullname, 'utf8', function(err, file) {
+                if (err) {
+                    reject(err);
+                    return;
+                }
+                
+                result[basename] = file;
+                
+                if (files[index])
+                    resolve(new Promise(again));
+                else
+                    resolve(result);
+            });
+        }).then(function(result) {
+            // Take a bunch of burden off the heap
+            return new Buffer(JSON.stringify(result), 'utf8');
+        });
+    }
     
     function removeFromQueue(waiter, hint) {
         if (hint === undefined || waitQueue[hint] !== waiter)

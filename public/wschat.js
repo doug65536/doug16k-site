@@ -1,6 +1,8 @@
 (function loadWSChat(window, $, tldLookup, emojiLookup) {
     "use strict";
     
+    polyfills();
+    
     var chatContainer = $('.chat-container'),
         chatUsername = $('.chat-username'),
         chatMessages = $('.chat-messages'),
@@ -9,6 +11,7 @@
         problemIndicator = $('.chat-problem'),
         chatDesktopNotificationPane = $('.chat-desktop-notification-pane'),
         chatDesktopNotification = $('.chat-desktop-notification'),
+        chatSound = $('.chat-sound'),
         username,
         changeRoom = $('.chat-change-room'),
         changeSettings = $('.chat-change-settings'),
@@ -25,7 +28,14 @@
         preservedMessage,
         messageLimit = 128,
         emojiRequest = getEmojiData(),
-        emojiUI;
+        emojiUI,
+        Notif = window.webkitNotification || 
+            window.mozNotification ||
+            window.Notification,
+        allowSound = false,
+        minDelayBetweenSounds = 4000,
+        notificationSound,
+        notificationSoundUrl = 'vendor/notification-sound.mp3';
     
     // In priority order
     var markupRenderTable;
@@ -115,7 +125,9 @@
             setUsername(username);
     }
     
-    chatPickEmoji.on('click', showEmojiUI);
+    
+    
+    chatFooter.on('click', pickEmojiHandler);
     
     chatUsername.on('input change', function usernameChangeHandler(event) {
         username = chatUsername.val();
@@ -129,6 +141,13 @@
     if (!username)
         assignUsername();
     
+    bindCheckboxLocalStorage(function(value) {
+        if (Notif && value) {
+            if (Notif.permission !== 'granted')
+                Notif.requestPermission();
+        }
+    }, chatDesktopNotification, 'chatNotification');
+    
     changeSettings.on('click', function(event) {
         chatContainer.toggleClass('chat-serif chat-sans');
     });
@@ -138,6 +157,8 @@
     });
     
     chatEntry.on('input keypress', function chatKeypressHandler(event) {
+        var dir;
+        
         if (event.type === 'input') {
             chatSend.prop('disabled', isCurrentMessageEmpty());
             return;
@@ -146,9 +167,12 @@
         switch (event.which) {
         case 13:
             sendCurrentMessage();
+            event.preventDefault();
             break;
         }
-    }).on('keydown', function chatKeydownHandler(event) {
+    });
+    
+    chatEntry.on('keydown', function chatKeydownHandler(event) {
         var messages,
             message,
             dir,
@@ -210,9 +234,17 @@
         
         case 33:
         case 34:
-            dir = event.which === 33 ? 1 : -1;
+        case 35:
+        case 36:
+            dir = event.which === 33 ? 1 : 
+                event.which === 34 ? -1 :
+                (event.ctrlKey && (event.which === 35)) ? -1000 :
+                (event.ctrlKey && (event.which === 36)) ? 1000 :
+                0;
+            
             chatMessages.scrollTop(chatMessages.scrollTop() +
-                dir * chatMessages.innerHeight * 0.95);
+                dir * chatMessages.innerHeight() * 0.95);
+            
             break;
             
         }
@@ -233,7 +265,9 @@
                 selectedIndex: selectedIndex
             };
         }
-    }).focus();
+    });
+        
+    chatEntry.focus();
     
     chatMessages.on('wheel', function chatWheelHandler(event) {
         event.preventDefault();
@@ -245,45 +279,47 @@
         
         chatMessages.scrollTop(scroll -
             Math.sign(delta) * dist);
-    }).on('keydown', function chatKeydownHandler(event) {
-        var dist,
-            pageHeight = chatMessages.innerHeight(),
-            lineHeight = 24,
-            panWidth = 24,
-            scroll,
-            dist = { x: 0, y: 0 };
-        
-        scroll = chatMessages.scrollTop();
-        
-        switch (event.which) {
-        case 33:// pgup
-            dist.y = -height; break;
-        case 34:// pgdn
-            dist.y = height; break;
-        case 35:// end
-            dist.x = +Infinity; break;
-        case 36:// home 
-            dist.x = -Infinity; break;
-        case 37:// left
-            dist.x = -panWidth; break;
-        case 38:// up
-            dist.y = -lineHeight; break;
-        case 39:// right
-            dist.x = panWidth; break;
-        case 40:// down
-            dist.y = lineHeight; break;
-        }
-        if (dist.x) {
-            scroll = chatMessages.scrollLeft();
-            chatMessage.scrollLeft(scroll + dist.x);
-        }
-        if (dist.y) {
-            scroll = chatMessages.scrollTop();
-            chatMessage.scrollTop(scroll + dist.y);
-        }
-        if (dist.x || dist.y)
-            event.preventDefault();
     });
+    
+//    chatMessages.on('keydown', function chatKeydownHandler(event) {
+//        var dist,
+//            pageHeight = chatMessages.innerHeight(),
+//            lineHeight = 24,
+//            panWidth = 24,
+//            scroll,
+//            dist = { x: 0, y: 0 };
+//        
+//        scroll = chatMessages.scrollTop();
+//        
+//        switch (event.which) {
+//        case 33:// pgup
+//            dist.y = -height; break;
+//        case 34:// pgdn
+//            dist.y = height; break;
+//        case 35:// end
+//            dist.x = +Infinity; break;
+//        case 36:// home 
+//            dist.x = -Infinity; break;
+//        case 37:// left
+//            dist.x = -panWidth; break;
+//        case 38:// up
+//            dist.y = -lineHeight; break;
+//        case 39:// right
+//            dist.x = panWidth; break;
+//        case 40:// down
+//            dist.y = lineHeight; break;
+//        }
+//        if (dist.x) {
+//            scroll = chatMessages.scrollLeft();
+//            chatMessage.scrollLeft(scroll + dist.x);
+//        }
+//        if (dist.y) {
+//            scroll = chatMessages.scrollTop();
+//            chatMessage.scrollTop(scroll + dist.y);
+//        }
+//        if (dist.x || dist.y)
+//            event.preventDefault();
+//    });
     
     chatFooter.on('click', '.chat-emoji', function(event) {
         var clicked = $(event.target).closest('.chat-emoji'),
@@ -312,28 +348,31 @@
         chatEntry.focus();
     });
     
-    chatDesktopNotification.on('click', function(event) {
-        enableNotification(chatDesktopNotification.prop('checked'));
+    chatSound.on('click', function(event) {
+        
+        allowSoundLater();
     });
     
-    function enableNotification(enable) {
-        var n;
+    allowSoundLater();
+    
+    function bindCheckboxLocalStorage(callback, checkbox, propName) {
+        var value;
         
-        if (window.webkitNotifications) {
-            if (window.webkitNotifications.checkPermission() === 0) {
-                // 0 is PERMISSION_ALLOWED
-                n = window.webkitNotifications.createNotification(
-                    'vendor/emojione.com/1f642.svg', 
-                    'Notification Title', 
-                    'Notification content...');
-                //n.ondisplay = function() {};
-                //n.onclose = function() {};
-                
-                n.show();
-            } else if (enable) {
-                window.webkitNotifications.requestPermission();
-            }
-        }
+        if (!localStorage)
+            return;
+        
+        value = localStorage.getItem(propName);
+        
+        if (value !== undefined)
+            checkbox.prop('checked', value);
+        
+        callback(value);
+        
+        checkbox.on('change', function(event) {
+            var value = this.checked;
+            localStorage.setItem(propName, value);
+            callback(value);
+        });
     }
     
     function sortByProps() {
@@ -435,6 +474,10 @@
     function regexEscape(s) {
         return s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
     }
+    
+    function matchWholeWordRegex(needle) {
+        return new RegExp(regexEscape(needle) + '(?![a-zA-Z0-9,.-])', 'i');
+    }
  
     function getEmojiIndex() {
         return $.getJSON({
@@ -497,7 +540,57 @@
         return obj;
     }
     
-    function showEmojiUI(event) {
+    function replaceInputSelectedText(input, code, next) {
+        var range,
+            start;
+        if (input.selectionStart !== undefined && 
+                input.selectionEnd !== undefined) {
+            if (input.setRangeText) {
+                input.setRangeText(code, input.selectionStart, input.selectionEnd);
+            } else {
+                start = input.selectionStart;
+                input.value = input.value.substr(0, start) +
+                    code +
+                    input.value.substr(input.selectionEnd);
+                
+            }
+            
+            if (input.setSelectionRange) {
+                input.setSelectionRange(input.selectionStart + code.length,
+                    input.selectionStart + code.length);
+            } else {
+                start += code.length;
+                input.selectionStart = start;
+                input.selectionEnd = start;
+            }
+            next();
+        } else if (document.selection && document.selection.createRange) {
+            // IE
+            $(input).one('focus', function(event) {
+                range = document.selection.createRange();
+                range.text = code;
+                next();
+            });
+        }
+    }
+
+    function pickEmojiHandler(event) {
+        var target = $(event.target),
+            emoji = target.closest('.chat-emoji'),
+            button = target.closest(chatPickEmoji),
+            input = chatEntry.get(0),
+            code = emoji.attr('data-chat-emoji-code');
+        
+        if (emoji.length) {
+            replaceInputSelectedText(input, code, function() {
+                if (!event.ctrlKey)
+                    emojiUI.hide();
+            });
+            return;
+        } else if (!button.length) {
+            return;
+        }
+        
         if (emojiUI) {
             emojiUI.toggle();
             return;
@@ -508,9 +601,12 @@
                 byCategory,
                 catList;
         
-            $(document).on('focusin', function(event) {
+            $(document).on('focusin click', function(event) {
                 var target = $(event.target);
-                if (emojiUI && !target.closest(emojiUI).length)
+                if (emojiUI && (
+                    !target.closest(chatPickEmoji).length &&
+                    !target.closest(emojiUI).length
+                    ))
                     emojiUI.hide();
             });
             
@@ -577,12 +673,19 @@
 
                     list.forEach(function(emoji) {
                         var li,
-                            img;
-
+                            img,
+                            code;
+                        
+                        code = emoji.aliases_ascii &&
+                            emoji.aliases_ascii.length &&
+                            emoji.aliases_ascii[0] ||
+                            emoji.shortname;
+                        
                         img = $('<img/>', {
                             'class': 'chat-emoji',
                             title: emoji.shortname,
                             src: emojies.files.dir + emoji.unicode + '.svg',
+                            'data-chat-emoji-code': code
                         });
                         
                         expectedImages.push(img.get(0));
@@ -654,7 +757,7 @@
                             progressTimeout = undefined;
                         }
                         submenu.addClass('chat-load-finished');
-                        overlay.fadeOut().queue(function() {
+                        overlay.text('Loading...100%').fadeOut().queue(function() {
                             overlay.remove();
                             overlay = undefined;
                         });
@@ -665,7 +768,6 @@
                         }
                     }
                 }
-                
             }, byCategory);
             
             emojiUI = categoryList;
@@ -740,7 +842,10 @@
                 console.log('sendMessage error:', err);
                 backoff = (backoff && (backoff * 2)) || 100;
                 backoff = Math.min(120000, backoff);
-                return sendMessage(sender, message, backoff);
+                if (backoff <= 3200)
+                    return sendMessage(sender, message, backoff);
+
+                throw new Error(err);
             });
         }
     }
@@ -907,7 +1012,8 @@
             if (response.messages) {
                 var items,
                     animClassName,
-                    frag = $(window.document.createDocumentFragment());
+                    frag = $(window.document.createDocumentFragment()),
+                    mentionRegex = matchWholeWordRegex('@' + username);
                 animClassName = response.messages.length > 8 ? 
                     'chat-load' : 'chat-reveal';
                 items = response.messages.map(function updateMapMessage(message) {
@@ -920,11 +1026,17 @@
                     item.addClass(animClassName);
                     frag.prepend(item);
                     
-                    if (window.Notification && 
-                        message.message.indexOf('@' + username) >= 0) {
-                        new Notification('doug16k.com chat', {
-                            body: message.sender + ' mentioned you'
-                        });
+                    if (mentionRegex.test(message.message)) {
+                        if (Notif) {
+                            new Notif('doug16k.com chat', {
+                                icon: 'vendor/emojione.com/1f642.svg',
+                                body: message.sender + ' mentioned you\n' + 
+                                    message.message
+                            });
+
+                        }
+                        
+                        playSound(notificationSoundUrl);
                     }
                     
                     return item.get(0);
@@ -956,12 +1068,49 @@
         });
     }
     
+    function playSound(url) {
+        var audio;
+        
+        if (!window.Audio)
+            return;
+        
+        if (!allowSound)
+            return;
+        
+        if (url) {
+            if (!notificationSound)
+                notificationSound = new Audio(url);
+            
+            notificationSound.play();
+        }
+        
+        allowSoundLater();
+    }
+    
+    function allowSoundLater() {
+        allowSound = false;
+        setTimeout(function() {
+            allowSound = chatSound.prop('checked');
+        }, minDelayBetweenSounds);
+    }
+    
     function netHavingProblem(problem) {
         problemIndicator.toggleClass('hidden', !problem);
     }
     
     function categorizeEmojies() {
         emojiIndex
+    }
+    
+    function polyfills() {
+        if (!Math.sign) {
+            Math.sign = function(n) {
+                return n !== n ? NaN :
+                    n < 0 ? -1.0 :
+                    n > 0 ? 1.0 :
+                    0;
+            };
+        }
     }
 }(window, jQuery, [
     // http://data.iana.org/TLD/tlds-alpha-by-domain.txt
