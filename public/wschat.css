@@ -83,6 +83,7 @@
 
 .chat-code {
     font-family: monospace;
+    font-size: 0.9em;
     margin: 0px;
     padding: 2px 6px;
     background: #E6E6E6;
@@ -91,6 +92,7 @@
 .chat-container button {
     outline: none;
     border: none;
+    min-height: 20px;
 }
 
 
@@ -214,20 +216,6 @@
 
 .chat-send {
     font-weight: bold;
-}
-
-.chat-container.chat-serif,
-.chat-container.chat-serif a,
-.chat-container.chat-serif input,
-.chat-container.chat-serif button {
-    font-family: Amiri;    
-}
-
-.chat-container.chat-sans,
-.chat-container.chat-sans a,
-.chat-container.chat-sans input,
-.chat-container.chat-sans button {
-    font-family: Arimo;
 }
 
 .chat-container input:focus, 
@@ -368,3 +356,72 @@
         background-color: #FFF;
     }
 }
+
+/* ================================================== */
+
+.chat-sidebar label,
+.chat-sidebar label select {
+    display: block;
+}
+
+.chat-sidebar label {
+    margin: 4px 0px;
+    user-select: none;
+}
+
+.chat-sidebar label:focus {
+    outline: dotted 1px;
+}
+
+.chat-sidebar label select {
+    width: 100%;
+    padding: 4px;
+}
+
+.chat-sidebar ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* ================================================== */
+
+.chat-accordian {
+    margin-bottom: 4px;
+}
+
+.chat-accordian .chat-accordian-title {
+    width: 100%;
+    text-align: left;
+    color: #888;
+    cursor: default;
+}
+
+.chat-accordian.chat-accordian-opened .chat-accordian-title {
+    color: #222;
+}
+
+.chat-accordian.chat-accordian-opened .chat-accordian-title:before {
+    content: "\25BC";
+    color: #888;
+}
+
+.chat-accordian.chat-accordian-closed .chat-accordian-title:before {
+    content: "\25BA";
+    color: #888;
+}
+
+.chat-accordian.chat-accordian-opened .chat-accordian-content {
+    background: #CEF;
+    padding: 2px;
+}
+
+.chat-accordian.chat-accordian-opened {
+    border: solid #CCC 1px;
+}
+
+.chat-accordian.chat-accordian-closed .chat-accordian-content {
+    height: 0px;
+    overflow: hidden;
+}
+

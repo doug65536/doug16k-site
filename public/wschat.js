@@ -3,7 +3,14 @@
     
     polyfills();
     
-    var chatContainer = $('.chat-container'),
+    var localStorage = window.localStorage || {},
+        Notif = window.webkitNotification || 
+            window.mozNotification ||
+            window.Notification,
+        chatFont = $('.chat-font'),
+        fontLookup = initFontLookup(chatFont),
+        currentFontStyle,
+        chatContainer = $('.chat-container'),
         chatUsername = $('.chat-username'),
         chatMessages = $('.chat-messages'),
         chatFooter = $('.chat-footer'),
@@ -14,7 +21,6 @@
         chatSound = $('.chat-sound'),
         username,
         changeRoom = $('.chat-change-room'),
-        changeSettings = $('.chat-change-settings'),
         chatEntry = $('.chat-entry'),
         chatSend = $('.chat-send'),
         chatPickEmoji = $('.chat-pick-emoji'),
@@ -23,15 +29,11 @@
         chatText = chatMessage.find('.chat-text'),
         chatTime = chatMessage.find('.chat-timestamp'),
         lastKnownMessage = -1,
-        localStorage = window.localStorage,
         currentMessage = -1,
         preservedMessage,
         messageLimit = 128,
         emojiRequest = getEmojiData(),
         emojiUI,
-        Notif = window.webkitNotification || 
-            window.mozNotification ||
-            window.Notification,
         allowSound = false,
         minDelayBetweenSounds = 4000,
         notificationSound,
@@ -119,12 +121,9 @@
     });
     handleHash();
     
-    if (localStorage) {
-        username = localStorage.getItem('username');
-        if (username)
-            setUsername(username);
-    }
-    
+    username = localStorage.username;
+    if (username)
+        setUsername(username);
     
     
     chatFooter.on('click', pickEmojiHandler);
@@ -134,12 +133,15 @@
         chatText.prop('disabled', 
             !username || !username.length);
         
-        if (localStorage)
-            localStorage.setItem('username', username);
+        localStorage.username = username;
     });
     
     if (!username)
         assignUsername();
+    
+    bindValLocalStorage(function(value) {
+        setFont(value);
+    }, chatFont, 'chatFont');
     
     bindCheckboxLocalStorage(function(value) {
         if (Notif && value) {
@@ -148,13 +150,30 @@
         }
     }, chatDesktopNotification, 'chatNotification');
     
-    changeSettings.on('click', function(event) {
-        chatContainer.toggleClass('chat-serif chat-sans');
-    });
-    
     chatSend.on('click', function(event) {
         sendCurrentMessage();
     });
+    
+    chatFont.on('change', function(event) {
+        var value = chatFont.val();
+        setFont(value);
+    });
+    
+    function setFont(name) {
+        var newFontStyle;
+        
+        newFontStyle = fontLookup[name];
+        
+        if (!newFontStyle)
+            return false;
+        
+        newFontStyle.appendTo('head');
+        
+        if (currentFontStyle && !currentFontStyle.is(newFontStyle))
+            currentFontStyle.remove();
+        
+        currentFontStyle = newFontStyle;
+    }
     
     chatEntry.on('input keypress', function chatKeypressHandler(event) {
         var dir;
@@ -340,6 +359,12 @@
             range.collapse();
         }
     });
+    
+    chatContainer.on('click', '.chat-accordian-title', function(event) {
+        $(event.target)
+            .closest('.chat-accordian')
+            .toggleClass('chat-accordian-opened chat-accordian-closed');
+    });
 
     emojiRequest
     .then(function(emojies) {
@@ -349,28 +374,41 @@
     });
     
     chatSound.on('click', function(event) {
-        
         allowSoundLater();
     });
     
     allowSoundLater();
     
+    function bindValLocalStorage(callback, control, propName) {
+        var value;
+        
+        value = localStorage[propName];
+        
+        if (value !== undefined)
+            control.val(value);
+        
+        callback(value);
+        
+        control.on('input change', function(event) {
+            var value = control.val();
+            localStorage[propName] = value;
+            callback(value);
+        });
+    }
+    
     function bindCheckboxLocalStorage(callback, checkbox, propName) {
         var value;
         
-        if (!localStorage)
-            return;
-        
-        value = localStorage.getItem(propName);
+        value = localStorage[propName];
         
         if (value !== undefined)
-            checkbox.prop('checked', value);
+            checkbox.prop('checked', (value !== 'false'));
         
         callback(value);
         
         checkbox.on('change', function(event) {
             var value = this.checked;
-            localStorage.setItem(propName, value);
+            localStorage[propName] = value;
             callback(value);
         });
     }
@@ -1027,7 +1065,8 @@
                     frag.prepend(item);
                     
                     if (mentionRegex.test(message.message)) {
-                        if (Notif) {
+                        if (Notif && 
+                            localStorage.chatNotification !== 'false') {
                             new Notif('doug16k.com chat', {
                                 icon: 'vendor/emojione.com/1f642.svg',
                                 body: message.sender + ' mentioned you\n' + 
@@ -1098,8 +1137,60 @@
         problemIndicator.toggleClass('hidden', !problem);
     }
     
-    function categorizeEmojies() {
-        emojiIndex
+    function initFontLookup(select) {
+        var fonts,
+            url,
+            fontLookup;
+        
+        fonts = [
+            'Open Sans',
+            'Josefin Slab', 
+            'Arvo', 
+            'Lato', 
+            'Vollkorn', 
+            'Abril Fatface', 
+            'Ubuntu', 
+            'PT Sans',
+            'PT Serif', 
+            'Old Standard TT', 
+            'Droid Sans',
+            'Amiri',
+            'Arimo'
+        ];
+        
+        url = 'https://fonts.googleapis.com/css?family=';
+        
+        select.empty();
+        
+        fontLookup = fonts.reduce(function(fontLookup, name) {
+            var css;
+            
+            css = [
+                '@import url(' + url + 
+                    encodeURIComponent(name) + ');',
+                '.chat-container,',
+                '.chat-container a,',
+                '.chat-container input,',
+                '.chat-container select,',
+                '.chat-container button {',
+                'font-family: \'' + name + '\';',
+                '}'
+            ].join('\n');
+            
+            fontLookup[name] = $('<style/>', {
+                text: css
+            });
+            
+            $('<option/>', {
+                value: name,
+                text: name,
+                appendTo: select
+            });
+            
+            return fontLookup;
+        }, {});
+        
+        return fontLookup;
     }
     
     function polyfills() {

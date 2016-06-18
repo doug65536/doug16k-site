@@ -4,7 +4,6 @@
             <div>Room:&nbsp;</div>
             <div class="chat-flex chat-grow">Prototype room</div>
             <button>change room</button>
-            <button class="chat-change-settings">settings</button>
         </div>
         
         <div class="chat-messages chat-message-scroll chat-grow chat-scrollable chat-flip-vertical">
@@ -27,28 +26,45 @@
         </div>
         <div class="chat-problem chat-hidden">Network problem</div>
     </div>
-    <div class="chat-flex chat-column chat-sidebar">
-        <div class="chat-desktop-notification-pane">
-            <label title="Show desktop notification">
-                <input type="checkbox" class="chat-desktop-notification">
-                Notifications
-            </label>
-            <label title="Sound when @mentioned">
-                <input type="checkbox" class="chat-sound" checked>
-                Sound
-            </label>
+    <div class="chat-flex chat-column chat-sidebar chat-scrollable">
+        <div class="chat-accordian chat-accordian-closed">
+            <button class="chat-accordian-title">Settings</button>
+            <div class="chat-accordian-content">
+                <label title="Show desktop notification">
+                    <input type="checkbox" class="chat-desktop-notification">
+                    Notifications
+                </label>
+                <label title="Sound when @mentioned">
+                    <input type="checkbox" class="chat-sound" checked>
+                    Sound
+                </label>
+                <label>
+                    Font
+                    <select class="chat-font">
+                        <option value="chat-sans">Arimo</option>
+                        <option value="chat-serif">Amiri</option>
+                    </select>
+                </label>
+            </div>
         </div>
-        <div class="chat-joined-rooms-list chat-scrollable">
-            joined
+        <div class="chat-accordian chat-accordian-opened">
+            <button class="chat-accordian-title">Joined Rooms</button>
+            <div class="chat-accordian-content">
+                <ul>
+                    <li>Prototype room</li>
+                </ul>
+            </div>
         </div>
-        <div class="chat-grow chat-active-list chat-scrollable">
-            <ul><li>A</li><li>B</li><li>C</li><li>D</li></ul>
-        </div>
-        <div class="chat-stars-list">
-            stars
+        <div class="chat-accordian chat-accordian-opened">
+            <button class="chat-accordian-title">Starboard</button>
+            <div class="chat-accordian-content">
+            </div>
         </div>
     </div>
 </div>
+<script src="vendor/promise.js"></script>
+<script src="vendor/jquery-2.2.4.min.js"></script>
+
 <!--ul>
     <li><a target="_blank" href="https://github.com">github.com</a></li>
     <li><a target="_blank" href="https://gist.github.com">gist.github.com</a></li>
@@ -79,5 +95,3 @@
     <li><a target="_blank" href="https://www.youtube.com/">YouTube</a></li>
     <li><a target="_blank" href="http://www.rfcreader.com/">RFC Reader</a></li>
 </ul-->
-<script src="vendor/promise.js"></script>
-<script src="vendor/jquery-2.2.4.min.js"></script>
