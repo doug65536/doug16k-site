@@ -1,7 +1,8 @@
 "use strict";
 
 
-var crypto = require('crypto'),
+var Promise = require('bluebird'),
+    crypto = require('crypto'),
     Sequelize = require('sequelize'),
     dbconfig = require('./chatserverconfig'),
     db,
@@ -51,13 +52,21 @@ Session = db.define('session', {
 
 Session.hasOne(User);
 
-db.sync({force: false});
+db.sync({
+    force: false
+});
 
 var pbkdfRounds = 262139,
     pbkdfLength = 384>>3,
     pbkdfDigest = 'sha256';
 
 module.exports = {
+    // For associations
+    db: {
+        User: User,
+        Session: Session
+    },
+    
     // Returns a promise that resolves to true or false
     checkPassword: function(username, password) {
         var record,

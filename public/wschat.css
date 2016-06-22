@@ -36,7 +36,7 @@
 
 .chat-fixed {
     position: fixed;
-    padding: 4px;
+    padding: 2px;
     box-sizing: border-box;
 }
 
@@ -60,6 +60,10 @@
     flex-grow: 1;
 }
 
+.chat-shrink {
+    flex-shrink: 1;
+}
+
 .chat-noshrink {
     flex-shrink: 0;
 }
@@ -68,17 +72,20 @@
     flex-grow: 0;
 }
 
-.chat-sidebar {
-    width: 20%;
-    max-width: 200px;
-}
-
 .chat-text-top {
     vertical-align: top;
 }
 
 .chat-container p {
     margin: 0;
+}
+
+.chat-container .chat-messages {
+    background: white;
+}
+
+.chat-container .chat-message {
+    word-wrap: break-word;
 }
 
 .chat-code {
@@ -92,7 +99,7 @@
 .chat-container button {
     outline: none;
     border: none;
-    min-height: 20px;
+    min-height: 28px;
 }
 
 
@@ -105,29 +112,30 @@
     margin: 5px 0px;
 }
 
-.chat-container.chat-sans .chat-message {
-    margin-bottom: 3px;
-}
-
 .chat-timestamp,
 .chat-sender {
     padding: 4px 2px 2px 2px;
 }
 
-.chat-text {
-    padding: 2px;
+.chat-container.chat-hide-timestamp .chat-timestamp {
+    display:none;
 }
 
 .chat-text {
-    margin-left: 7px;
+    /* padding: 2px; */
+}
+
+.chat-text {
+    margin: 2px 7px;
 }
 
 
 .chat-timestamp,
 .chat-sender {
-    font-size: 12px;
+    font-size: 0.75em;
     text-align: right;
-    line-height: 1.5em;
+    white-space: nowrap;
+    overflow: hidden;
 }
 
 .chat-timestamp {
@@ -140,8 +148,6 @@
 }
 
 .chat-text {
-    font-size: 15px;
-    line-height: 1.5em;
 }
 
 .chat-footer {
@@ -150,9 +156,9 @@
 
 .chat-header,
 .chat-footer {
-    background-color: #CEF;
+    background-color: #DDD;
     box-sizing: border-box;
-    padding: 2px;
+    margin: 2px;
 }
 
 .chat-header {
@@ -160,7 +166,7 @@
 }
 
 .chat-sidebar {
-    margin-left: 6px;
+    /*margin-left: 4px;*/
 }
 
 .chat-hidden {
@@ -168,7 +174,7 @@
 }
 
 .chat-emoji {
-    height: 1.5em;    
+    height: 1.5em;
     vertical-align: sub;
 }
 
@@ -204,14 +210,19 @@
 .chat-username {
     margin-left: 0;
     text-align: right;
-    width: 132px;
+    width: 148px;
     padding-right: 3px;
-    height: 18px;
+}
+
+.chat-hide-timestamp .chat-username {
+    width: 94px;
 }
 
 .chat-entry {
     padding-left: 4px;
     margin-left: 4px;
+    min-width: 0;
+    width: 0;
 }
 
 .chat-send {
@@ -219,7 +230,7 @@
 }
 
 .chat-container input:focus, 
-.chat-container input {    
+.chat-container input {
     outline: none;
     border: none;
 }
@@ -284,14 +295,17 @@
     width: 27px;
 }
 
+/* chat menu hold open */
+
 .chat-popup-menuitem .chat-popup-menu {
     display: none;
 }
-
 .chat-popup-menuitem.chat-holdopen .chat-popup-menu,
 .chat-popup-menuitem:hover .chat-popup-menu {
     display: flex;
 }
+
+/* visually indicate own messages */
 
 .chat-message-own .chat-sender {
     background: radial-gradient(circle 64px at right, 
@@ -302,14 +316,14 @@
 
 @keyframes chat-reveal-anim {
     0% {
-        margin-bottom: -22px;
+        margin-bottom: -1.4666em;/*-26px;*/
         opacity: 0;
     }
     50% {
         opacity: 0;
     }
     100% {
-        margin-bottom: 3px;
+        margin-bottom: 0em;
         opacity: 1;
     }
 }
@@ -362,11 +376,11 @@
 .chat-sidebar label,
 .chat-sidebar label select {
     display: block;
+    white-space: nowrap;
 }
 
 .chat-sidebar label {
-    margin: 4px 0px;
-    user-select: none;
+    margin: 4px 4px;
 }
 
 .chat-sidebar label:focus {
@@ -387,41 +401,117 @@
 /* ================================================== */
 
 .chat-accordian {
-    margin-bottom: 4px;
+    margin-top: -2px;
 }
 
-.chat-accordian .chat-accordian-title {
+.chat-accordian > .chat-accordian-title {
     width: 100%;
     text-align: left;
-    color: #888;
+}
+
+.chat-accordian > .chat-accordian-title,
+.chat-haccordian > .chat-accordian-title {
     cursor: default;
 }
 
-.chat-accordian.chat-accordian-opened .chat-accordian-title {
+.chat-sideways {
+    position: relative;
+    top: 0px;
+    transform: rotate(90deg);
+    transform-origin: bottom;
+    left: -7px;
+    white-space: nowrap;
+}
+
+/* opened and closed accordian label colors */
+
+.chat-accordian.chat-accordian-opened > .chat-accordian-title,
+.chat-haccordian.chat-accordian-opened > .chat-accordian-title {
     color: #222;
 }
 
-.chat-accordian.chat-accordian-opened .chat-accordian-title:before {
+.chat-accordian.chat-accordian-closed > .chat-accordian-title,
+.chat-haccordian.chat-accordian-closed > .chat-accordian-title {
+    color: #888;
+}
+
+/* opened and closed indication */
+
+.chat-accordian > .chat-accordian-title:before,
+.chat-haccordian > .chat-accordian-title:before {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+/* vertical and horizontal accordian have opposite symbols */
+
+.chat-accordian.chat-accordian-opened > .chat-accordian-title:before,
+.chat-haccordian.chat-accordian-closed > .chat-accordian-title:before {
     content: "\25BC";
-    color: #888;
 }
 
-.chat-accordian.chat-accordian-closed .chat-accordian-title:before {
+.chat-accordian.chat-accordian-closed > .chat-accordian-title:before,
+.chat-haccordian.chat-accordian-opened > .chat-accordian-title:before {
     content: "\25BA";
-    color: #888;
 }
 
-.chat-accordian.chat-accordian-opened .chat-accordian-content {
-    background: #CEF;
-    padding: 2px;
+.chat-haccordian > .chat-accordian-content,
+.chat-accordian > .chat-accordian-content {
+    background: #DDD;
 }
 
-.chat-accordian.chat-accordian-opened {
-    border: solid #CCC 1px;
+/* keep the horizontal padding to make size consistent */
+
+.chat-accordian.chat-accordian-closed > .chat-accordian-content {
+    padding-top: 0;
+    padding-bottom: 0;
 }
 
-.chat-accordian.chat-accordian-closed .chat-accordian-content {
+.chat-accordian.chat-accordian-closed > .chat-accordian-content {
     height: 0px;
     overflow: hidden;
+}
+
+/* */
+
+.chat-haccordian {
+}
+
+.chat-accordian > .chat-accordian-title,
+.chat-haccordian > .chat-accordian-title {
+    background: #CCC;
+}
+
+.chat-haccordian > .chat-accordian-title {
+    width: 26px;
+    margin-right: 0px;
+    font-size: 0.9em;
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.chat-haccordian.chat-accordian-closed > .chat-accordian-content {
+    max-width: 0;
+    display: none;
+}
+
+.chat-haccordian.chat-accordian-closed {
+    max-width: 26px;
+}
+
+.chat-room-title {
+}
+
+.chat-haccordian > .chat-accordian-title:before {
+    left: 6px;
+    position: relative;
+}
+
+.chat-room {
+    margin-right: 2px;
+    width: 0;
 }
 

@@ -1,6 +1,7 @@
 "use strict";
 
-var cluster = require('cluster'),
+var Promise = require('bluebird'),
+    cluster = require('cluster'),
     fs = require('fs'),
     path = require('path'),
     ipc = require('./cluster-ipc'),
@@ -33,21 +34,24 @@ function master() {
     });
     
     dhpReadOrGenerate('dhparam.pem').then(function(dhp) {
-        //appModules.forEach(function(appModule) {
-        //    appModule.master();
-        //});
-
         // Echo enabled
-        ipc.masterRepeater(guid, true);
+        //ipc.masterRepeater(guid, true);
 
         // Wait for ticket keys to write out before starting
         ticketKeys.then(function() {
             return startAllWorkers();
         }).then(function() {
+            console.assert(Object.keys(cluster.workers).length === 2);
+            console.log('initializing master modules');
+
             // Load applications
             appModules.forEach(function(module) {
                 module.master(cluster);
             });
+
+            console.log('initializing master modules');
+        }, function(err) {
+            console.error(err);
         });
     }, function(err) {
         console.error(err);
@@ -73,22 +77,18 @@ function master() {
     }
 
     function startAllWorkers(){
-//        process.on('SIGHUP', function() {
-//            console.log('Recycling workers');
-//            sendCommandToAllWorkers({command:'recycle'});
-//        }).on('SIGINT', function() {
-//            stopping = true;
-//            sendCommandToAllWorkers({command:'recycle'});
-//        });
-
         return new Promise(function(resolve) {
             var workerCount = 2,
                 onlineCount = 0,
                 i;
             for (i = 0; i < workerCount; ++i) {
+                console.log('starting worker');
                 startWorker().on('online', function(worker) {
-                    if (++onlineCount === workerCount)
+                    console.log('worker came online');
+                    if (++onlineCount === workerCount) {
+                        console.log('all workers started');
                         resolve();
+                    }
                 });
             }
         });
@@ -99,7 +99,7 @@ function master() {
             worker.send(this);
         }, command);
     }
-};
+}
 
 function worker() {
     console.log('starting worker');
@@ -114,20 +114,18 @@ function worker() {
         helmet = require('helmet'),
         app = express(),
         staticMiddleware,
-        //serverAddr = process.env.IP || '0.0.0.0',
-        //serverPort = process.env.PORT || 80,
         httpServer,
         server;
 
-    ipc.workerReceiver(guid, function(message) {
-        if (message.command === 'recycle') {
-            console.log('got worker recycle in ' + cluster.worker.id);
-            server.close(function() {
-                console.log('server close completed');
-                cluster.worker.disconnect();
-            });
-        }
-    });
+//    ipc.workerReceiver(guid, function(message) {
+//        if (message.command === 'recycle') {
+//            console.log('got worker recycle in ' + cluster.worker.id);
+//            server.close(function() {
+//                console.log('server close completed');
+//                cluster.worker.disconnect();
+//            });
+//        }
+//    });
     
     app.use(helmet.hsts());
     
@@ -150,7 +148,9 @@ function worker() {
     }));
 
     // Load applications
+    console.log('starting worker modules', appModules.length);
     appModules.forEach(function(appModule) {
+        console.log('starting worker module');
         appModule.worker(cluster, app, jsonParser);
     });
 
@@ -216,7 +216,7 @@ function worker() {
         console.log('error!', err);
         throw err;
     });
-};
+}
 
 function processTemplate(template, data) {
     return template.replace(/{{(.*?)}}/g, function(whole, match, offset, input) {

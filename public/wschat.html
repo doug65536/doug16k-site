@@ -1,63 +1,88 @@
-<div class="chat-container chat-sans chat-flex chat-row chat-fixed chat-fill">
-    <div class="chat-flex chat-column chat-grow">
-        <div class="chat-header chat-flex chat-clip chat-noshrink">
-            <div>Room:&nbsp;</div>
-            <div class="chat-flex chat-grow">Prototype room</div>
-            <button>change room</button>
-        </div>
-        
-        <div class="chat-messages chat-message-scroll chat-grow chat-scrollable chat-flip-vertical">
-            <div class="chat-message chat-flex chat-flip-vertical">
-                <div class="chat-timestamp chat-noshrink"></div>
-                <div class="chat-sender chat-noshrink"></div>
-                <div class="chat-text chat-grow"></div>
-                <div class="chat-star chat-noshrink">
-                    <span title="Click to add or remove star">&#x2605;</span>
+<div class="chat-container chat-flex chat-row chat-fixed chat-fill">
+    <div class="chat-flex chat-row chat-grow chat-shrink">
+        <div class="chat-room chat-haccordian chat-accordian-opened
+             chat-flex chat-row chat-grow chat-shrink">
+            <div class="chat-accordian-title">
+                <div class="chat-sideways">
+                    Chat: Prototype room
+                </div>
+            </div>
+            <div class="chat-accordian-content chat-column chat-flex chat-grow">
+                <div class="chat-messages chat-message-scroll
+                     chat-grow chat-shrink
+                     chat-scrollable chat-flip-vertical">
+                    <div class="chat-message chat-flex chat-flip-vertical">
+                        <div class="chat-timestamp chat-noshrink"></div>
+                        <div class="chat-sender chat-noshrink"></div>
+                        <div class="chat-text chat-grow"></div>
+                        <div class="chat-star chat-noshrink">
+                            <span title="Click to add or remove star">&#x2605;</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-footer chat-flex chat-noshrink">
+                    <input class="chat-username">
+                    <input class="chat-entry chat-grow">
+                    <button class="chat-send">&#x21b5; Send</button>
+                    <button class="chat-add-emoji chat-pick-emoji">
+                        <img src="vendor/emojione.com/1f642.svg" alt="Emoji">
+                    </button>
                 </div>
             </div>
         </div>
-        <div class="chat-footer chat-flex chat-noshrink">
-            <div class=""><input class="chat-username"></div>
-            <input class="chat-entry chat-grow">
-            <button class="chat-send">&#x21b5; Send</button>
-            <button class="chat-add-emoji chat-pick-emoji">
-                <img src="vendor/emojione.com/1f642.svg">
-            </button>
-        </div>
         <div class="chat-problem chat-hidden">Network problem</div>
     </div>
-    <div class="chat-flex chat-column chat-sidebar chat-scrollable">
-        <div class="chat-accordian chat-accordian-closed">
-            <button class="chat-accordian-title">Settings</button>
-            <div class="chat-accordian-content">
-                <label title="Show desktop notification">
-                    <input type="checkbox" class="chat-desktop-notification">
-                    Notifications
-                </label>
-                <label title="Sound when @mentioned">
-                    <input type="checkbox" class="chat-sound" checked>
-                    Sound
-                </label>
-                <label>
-                    Font
-                    <select class="chat-font">
-                        <option value="chat-sans">Arimo</option>
-                        <option value="chat-serif">Amiri</option>
-                    </select>
-                </label>
-            </div>
+    <div class="chat-sidebar chat-haccordian chat-accordian-opened
+         chat-flex chat-row chat-noshrink">
+        <div class="chat-accordian-title">
+            <div class="chat-sideways">Options</div>
         </div>
-        <div class="chat-accordian chat-accordian-opened">
-            <button class="chat-accordian-title">Joined Rooms</button>
-            <div class="chat-accordian-content">
-                <ul>
-                    <li>Prototype room</li>
-                </ul>
+        <div class="chat-accordian-content chat-flex chat-column chat-scrollable">
+            <div class="chat-accordian chat-accordian-closed">
+                <button class="chat-accordian-title">Settings</button>
+                <div class="chat-accordian-content">
+                    <label title="Show desktop notification">
+                        <input type="checkbox" class="chat-desktop-notification">
+                        Notifications
+                    </label>
+                    <label title="Sound when @mentioned">
+                        <input type="checkbox" class="chat-sound" checked>
+                        Sound
+                    </label>
+                    <label>Font
+                        <select class="chat-font">
+                        </select>
+                    </label>
+                    <label>Font Size
+                        <select class="chat-font-size">
+                            <option value="1">+0%</option>
+                            <option value="1.1">+10%</option>
+                            <option value="1.2">+20%</option>
+                            <option value="1.3">+30%</option>
+                            <option value="1.4">+40%</option>
+                            <option value="1.5">+50%</option>
+                            <option value="1.6">+60%</option>
+                            <option value="1.7">+70%</option>
+                            <option value="1.8">+80%</option>
+                            <option value="1.9">+90%</option>
+                        </select>
+                    </label>
+                    <label title="Show timestamp beside messages">
+                        <input type="checkbox" 
+                               class="chat-show-timestamp">Timestamp
+                    </label>
+                </div>
             </div>
-        </div>
-        <div class="chat-accordian chat-accordian-opened">
-            <button class="chat-accordian-title">Starboard</button>
-            <div class="chat-accordian-content">
+            <div class="chat-accordian chat-accordian-opened">
+                <button class="chat-accordian-title">Joined Rooms</button>
+                <div class="chat-accordian-content">
+                    <label>Prototype room</label>
+                </div>
+            </div>
+            <div class="chat-accordian chat-accordian-opened">
+                <button class="chat-accordian-title">Starboard</button>
+                <div class="chat-accordian-content">
+                </div>
             </div>
         </div>
     </div>

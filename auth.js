@@ -1,6 +1,7 @@
 "use strict";
 
-var cluster = require('cluster'),
+var Promise = require('bluebird'),
+    cluster = require('cluster'),
     crypto = require('crypto');
 
 if (cluster.isMaster)

@@ -1,3 +1,4 @@
+/* global jQuery */
 (function loadWSChat(window, $, tldLookup, emojiLookup) {
     "use strict";
     
@@ -7,18 +8,23 @@
         Notif = window.webkitNotification || 
             window.mozNotification ||
             window.Notification,
-        chatFont = $('.chat-font'),
+        chatContainer = $('.chat-container'),
+        chatRoom = $('.chat-room', chatContainer),
+        chatSidebar = $('.chat-sidebar'),
+        chatFooter = $('.chat-footer'),
+        chatFont = $('.chat-font', chatSidebar),
+        chatFontSize = $('.chat-font-size', chatSidebar),
         fontLookup = initFontLookup(chatFont),
         currentFontStyle,
-        chatContainer = $('.chat-container'),
-        chatUsername = $('.chat-username'),
-        chatMessages = $('.chat-messages'),
-        chatFooter = $('.chat-footer'),
+        currentSizeStyle,
+        chatUsername = $('.chat-username', chatFooter),
+        chatMessages = $('.chat-messages', chatContainer),
         chatDynamicStyle = $('<style/>').appendTo('head'),
         problemIndicator = $('.chat-problem'),
         chatDesktopNotificationPane = $('.chat-desktop-notification-pane'),
         chatDesktopNotification = $('.chat-desktop-notification'),
         chatSound = $('.chat-sound'),
+        chatShowTimestamp = $('.chat-show-timestamp'),
         username,
         changeRoom = $('.chat-change-room'),
         chatEntry = $('.chat-entry'),
@@ -37,89 +43,8 @@
         allowSound = false,
         minDelayBetweenSounds = 4000,
         notificationSound,
-        notificationSoundUrl = 'vendor/notification-sound.mp3';
-    
-    // In priority order
-    var markupRenderTable;
-    markupRenderTable = [
-        {
-            re: /(`+)(.*?)\1/,
-            handler: function replaceBacktickCode(match) {
-                return $('<span/>', {
-                    'class': 'chat-code',
-                    text: match[2]
-                });
-            }
-        },
-        {
-            re: /\[(.*?)\]\((http.*)\)/, 
-            handler:  function replaceMarkdownUrl(match) {
-                return $('<a/>', {
-                    'class': 'chat-link',
-                    'href': match[2],
-                    text: match[1],
-                    target: '_blank'
-                });
-            }
-        },
-        {
-            re: /(http\S+)\b/, 
-            handler:  function replaceHttpPrefix(match) {
-                return $('<a/>', {
-                    'class': 'chat-link',
-                    'href': match[1],
-                    text: match[1],
-                    target: '_blank'
-                });
-            }
-        },
-        {
-            re: /(www\.\S+)\b/,
-            handler:  function replaceWWWPrefix(match) {
-                return $('<a/>', {
-                    'class': 'chat-link',
-                    'href': 'http://' + match[1],
-                    text: match[1],
-                    target: '_blank'
-                });
-            }
-        },
-        {
-            re: new RegExp('(\\S+\\.(?:' +
-                tldLookup.map(function makeTLDRegexFragment(tld) {
-                    return '(?:' + tld + ')';
-                }).join('|') + '))\\b', 'i'),
-            handler:  function replaceTLDSuffix(match) {
-                return $('<a/>', {
-                    'class': 'chat-link',
-                    'href': 'http://' + match[1],
-                    text: match[1],
-                    target: '_blank'
-                });
-            }
-        },
-        {
-            re: /(\*+)(.+?)\1/,
-            handler: function replaceAsterisks(match) {
-                switch (match[1].length) {
-                case 1:
-                    return $('<i/>', {
-                        text: match[2]
-                    });
-                case 2:
-                    return $('<b/>', {
-                        text: match[2]
-                    });
-                }
-            }
-        },
-        makeEmojiHandler()
-    ];
-    
-    $(window.document).on('hashchange', function hashchangeHandler(event) {
-        handleHash();
-    });
-    handleHash();
+        notificationSoundUrl = 'vendor/notification-sound.mp3',
+        markupRenderTable = makeMarkupRenderTable();
     
     username = localStorage.username;
     if (username)
@@ -143,21 +68,39 @@
         setFont(value);
     }, chatFont, 'chatFont');
     
+    bindValLocalStorage(function(value) {
+        setFontSize(value);
+    }, chatFontSize, 'chatFontSize');
+    
     bindCheckboxLocalStorage(function(value) {
         if (Notif && value) {
             if (Notif.permission !== 'granted')
                 Notif.requestPermission();
         }
     }, chatDesktopNotification, 'chatNotification');
+
+    bindCheckboxLocalStorage(function(value) {
+        chatContainer.toggleClass('chat-hide-timestamp', !value);
+    }, chatShowTimestamp, 'chatShowTimestamp');
     
     chatSend.on('click', function(event) {
         sendCurrentMessage();
     });
     
-    chatFont.on('change', function(event) {
+    chatFont.on('change input', function(event) {
         var value = chatFont.val();
         setFont(value);
     });
+    
+    chatFontSize.on('change input', function(event) {
+        var value = chatFontSize.val();
+        setFontSize(value);
+    });
+    
+    // hack
+    setTimeout(function() {
+        chatRoom.clone().insertAfter(chatRoom);
+    }, 5000);
     
     function setFont(name) {
         var newFontStyle;
@@ -173,6 +116,20 @@
             currentFontStyle.remove();
         
         currentFontStyle = newFontStyle;
+    }
+    
+    function setFontSize(size) {
+        var newSizeStyle;
+        
+        newSizeStyle = $('<style/>', {
+            appendTo: 'head',
+            text: '.chat-container, .chat-text { font-size: ' + 
+                (((2 - size) * 15) + 'px') + '}'
+        });
+        
+        if (currentSizeStyle)
+            currentSizeStyle.remove();
+        currentSizeStyle = newSizeStyle;
     }
     
     chatEntry.on('input keypress', function chatKeypressHandler(event) {
@@ -361,9 +318,16 @@
     });
     
     chatContainer.on('click', '.chat-accordian-title', function(event) {
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        
         $(event.target)
-            .closest('.chat-accordian')
+            .closest('.chat-accordian,.chat-haccordian')
             .toggleClass('chat-accordian-opened chat-accordian-closed');
+    });
+    
+    chatContainer.on('touch touchstart touchend', function(event) {
+        console.log('touch', event.type);
     });
 
     emojiRequest
@@ -373,7 +337,7 @@
         chatEntry.focus();
     });
     
-    chatSound.on('click', function(event) {
+    chatSound.on('click change', function(event) {
         allowSoundLater();
     });
     
@@ -391,24 +355,27 @@
         
         control.on('input change', function(event) {
             var value = control.val();
-            localStorage[propName] = value;
+            localStorage[propName] = String(value);
             callback(value);
         });
     }
     
-    function bindCheckboxLocalStorage(callback, checkbox, propName) {
+    function bindCheckboxLocalStorage(callback, checkbox, 
+            propName, defaultValue) {
         var value;
         
         value = localStorage[propName];
         
-        if (value !== undefined)
-            checkbox.prop('checked', (value !== 'false'));
+        value = (value === undefined) && defaultValue ||
+            (value !== 'false');
         
-        callback(value);
+        checkbox.prop('checked', value);
+        
+        callback(value !== false);
         
         checkbox.on('change', function(event) {
             var value = this.checked;
-            localStorage[propName] = value;
+            localStorage[propName] = String(value);
             callback(value);
         });
     }
@@ -832,10 +799,6 @@
         chatDynamicStyle.text(source);
     }
 
-    function handleHash() {
-        
-    }
-    
     function setUsername(name) {
         if (name)
             chatUsername.val(name).trigger('change');
@@ -866,7 +829,7 @@
         
         function attempt() {
             return $.post({
-                url: '/api/wschat/message/stream',
+                url: '/api/wschat/rooms/1/message/stream',
                 contentType: 'application/json',
                 data: JSON.stringify({
                     sender: sender,
@@ -1038,7 +1001,7 @@
     // but might reject
     function update(lastKnownMessage, backoff) {
         return $.getJSON({
-            url: '/api/wschat/message/stream',
+            url: '/api/wschat/rooms/1/message/stream',
             data: {
                 since: lastKnownMessage
             },
@@ -1067,12 +1030,15 @@
                     if (mentionRegex.test(message.message)) {
                         if (Notif && 
                             localStorage.chatNotification !== 'false') {
-                            new Notif('doug16k.com chat', {
-                                icon: 'vendor/emojione.com/1f642.svg',
-                                body: message.sender + ' mentioned you\n' + 
-                                    message.message
-                            });
-
+                            try {
+                                new Notif('doug16k.com chat', {
+                                    icon: 'vendor/emojione.com/1f642.svg',
+                                    body: message.sender + 
+                                        ' mentioned you\n' + 
+                                        message.message
+                                });
+                            } catch (err) {
+                            }
                         }
                         
                         playSound(notificationSoundUrl);
@@ -1129,7 +1095,7 @@
     function allowSoundLater() {
         allowSound = false;
         setTimeout(function() {
-            allowSound = chatSound.prop('checked');
+            allowSound = (localStorage.chatSound !== 'false');
         }, minDelayBetweenSounds);
     }
     
@@ -1193,6 +1159,83 @@
         return fontLookup;
     }
     
+    function makeMarkupRenderTable() {
+        return [
+            {
+                re: /(`+)(.*?)\1/,
+                handler: function replaceBacktickCode(match) {
+                    return $('<span/>', {
+                        'class': 'chat-code',
+                        text: match[2]
+                    });
+                }
+            },
+            {
+                re: /\[(.*?)\]\((http.*)\)/, 
+                handler:  function replaceMarkdownUrl(match) {
+                    return $('<a/>', {
+                        'class': 'chat-link',
+                        'href': match[2],
+                        text: match[1],
+                        target: '_blank'
+                    });
+                }
+            },
+            {
+                re: /(http\S+)\b/, 
+                handler:  function replaceHttpPrefix(match) {
+                    return $('<a/>', {
+                        'class': 'chat-link',
+                        'href': match[1],
+                        text: match[1],
+                        target: '_blank'
+                    });
+                }
+            },
+            {
+                re: /(www\.\S+)\b/,
+                handler:  function replaceWWWPrefix(match) {
+                    return $('<a/>', {
+                        'class': 'chat-link',
+                        'href': 'http://' + match[1],
+                        text: match[1],
+                        target: '_blank'
+                    });
+                }
+            },
+            {
+                re: new RegExp('(\\S+\\.(?:' +
+                    tldLookup.map(function makeTLDRegexFragment(tld) {
+                        return '(?:' + tld + ')';
+                    }).join('|') + '))\\b', 'i'),
+                handler:  function replaceTLDSuffix(match) {
+                    return $('<a/>', {
+                        'class': 'chat-link',
+                        'href': 'http://' + match[1],
+                        text: match[1],
+                        target: '_blank'
+                    });
+                }
+            },
+            {
+                re: /(\*+)(.+?)\1/,
+                handler: function replaceAsterisks(match) {
+                    switch (match[1].length) {
+                    case 1:
+                        return $('<i/>', {
+                            text: match[2]
+                        });
+                    case 2:
+                        return $('<b/>', {
+                            text: match[2]
+                        });
+                    }
+                }
+            },
+            makeEmojiHandler()
+        ];
+    }
+    
     function polyfills() {
         if (!Math.sign) {
             Math.sign = function(n) {
@@ -1203,7 +1246,7 @@
             };
         }
     }
-}(window, jQuery, [
+}(this, jQuery, [
     // http://data.iana.org/TLD/tlds-alpha-by-domain.txt
     // Version 2016061100, Last Updated Sat Jun 11 07:07:01 2016 UTC
     'AAA', 'AARP', 'ABB', 'ABBOTT', 'ABBVIE', 'ABOGADO', 'ABUDHABI', 'AC',

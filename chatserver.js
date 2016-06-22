@@ -1,12 +1,12 @@
 "use strict";
 
-var cluster = require('cluster'),
+var Promise = require('bluebird'),
+    cluster = require('cluster'),
     fs = require('fs'),
     path = require('path'),
+    util = require('./util'),
     ipc = require('./cluster-ipc'),
-    guidMessage = '08b9caf0-02b9-4ad4-9381-ecab048cc168',
-    guidPrimeCache = '5522ba1c-b703-4104-9ad5-1c35825098c0',
-    guidUserList = '0a201ef0-e742-4d49-a7fa-b72016b339c9';
+    guidMessage = '08b9caf0-02b9-4ad4-9381-ecab048cc168';
 
 if (cluster.isMaster)
     module.exports.master = master;
@@ -19,198 +19,216 @@ if (cluster.isWorker)
 // - one of the workers gets the POST to send a message
 // - the worker sends guidMessage to master
 // - master inserts it into the database, assigns it an id
-// - master broadcasts guidMessage to all workers
-// - all workers receive guidMessage and they update their cache
-// - all workers service their wait queue
+// - master broadcasts guidMessage with room name to all workers
+// - all workers receive guidMessage and service their wait queue
+// - each chat room has its own queue
 
 function master() {
-    var nextId = 1,
-        chatdb = require('./chatserverdb'),
+    //console.log('starting chat server master');
+    
+    var chatdb = require('./chatserverdb'),
         broadcastSender = ipc.makeMasterBroadcastSender(guidMessage),
         userList = {};
     
-    ipc.masterMessageReceiver(guidPrimeCache, function(msg, worker) {
-        chatdb.getLatest(128).then(function(records) {
-            msg.records = records;
-            worker.send(msg);
-        });
-    });
-    
+    chatdb.sync(false)
+    .catch(util.makeErrorDumper('chat sync'))
+    //.then(function() {
+    //    chatdb.createDefaultRoom();
+    //});
+
+    //console.log('starting master message receiver');
+
+    // Only the master inserts messages, and broadcasts a 
+    // notification for the room
     ipc.masterMessageReceiver(guidMessage, function(msg, worker) {
+        //console.log('master got message', msg);
         chatdb.insertMessage(msg)
         .then(function(ins) {
-            msg.record = ins;
-            broadcastSender(msg);
+            broadcastSender({
+                roomActivity: ins.roomId,
+                messageId: ins.id
+            });
         }, function(err) {
-            console.log('chat message insert error!', err);
+            console.error('chat message insert error!', err);
             msg.error = err;
             broadcastSender(msg);
         });
     });
     
-    ipc.masterMessageReceiver(guidUserList, function(msg, worker) {
-        var touch = msg.touch,
-            existing;
-        
-        if (msg.touch) {
-            existing = userList[touch];
-            
-            // Clear existing timeout
-            if (existing !== undefined)
-                clearTimeout(existing);
-            
-            // Register timeout
-            userList[touch] = setTimeout(function(touch) {
-                delete userList[touch];
-            }, 5 * 60 * 1000, touch);
-
-            msg.userList = Object.keys(userList);
-            worker.send(msg);
-        }
-    });
+    //console.log('master listening for messages');
 };
 
 function worker(cluster, app, jsonParser) {
-    console.log(cluster.worker.id, 'starting chat server worker');
+    //console.log(cluster.worker.id, 'starting chat server worker');
     
-    var waitQueue = [],
+    var chatdb = require('./chatserverdb'),
+        waitQueues = {},
         sendMessageToMaster = ipc.makeWorkerSender(guidMessage),
-        requestPrimeCache = ipc.makeWorkerSender(guidPrimeCache),
-        messages = [],
-        nextId = 1,
-        defaultLimit = 128,
-        messageLimit = 4096,
+        defaultLimit = 64,
         nextUniqueUsername = Date.now() - 1464414604408,
-        userListRequests = {},
-        userListRequestNextId = 1,
-        requestUserList = ipc.makeWorkerSender(guidUserList),
         emojiPackage,
-        emojiPackageTimeout;
-    
-    ipc.workerReceiver(guidUserList, function(msg) {
-        var entry = userListRequests[msg.userListRequestId];
-        delete userListRequests[msg.userListRequestId];
-        
-        entry.res.send(msg.userList);
-        clearTimeout(entry.timeout);
-    });
+        emojiPackageTimeout,
+        roomLatest = {};
     
     ipc.workerReceiver(guidMessage, function(msg) {
-        if (msg.record)
-            appendRecord(msg.record);
-        serviceWaitQueue();
-    });
-    
-    // Prime message cache
-    ipc.workerReceiver(guidPrimeCache, function(msg) {
-        console.log('primecache received', msg.records.length);
-        msg.records.sort(function(a, b) {
-            var na = +a.id,
-                nb = +b.id;
-            return na < nb ? -1 : nb < na ? 1 : 0;
-        }).forEach(function(record) {
-            appendRecord(record);
-        });
-        serviceWaitQueue();
-    });
-    
-    requestPrimeCache({});
-    
-    app.get('/api/wschat/users/online', function(req, res) {
-        var userListRequestId = userListRequestNextId++,
-            entry;
-            
-        entry = {
-            id: userListRequestId,
-            res: res,
-            timeout: 0
-        };
+        var room = +msg.roomActivity,
+            id = +msg.messageId;
         
-        entry.timeout = setTimeout(function(entry) {
-            entry.res.status(500).end();
-        }, 5 * 60 * 1000, entry);
+        // Remember the newest id, per room, to avoid
+        // a lot of SQL queries that return nothing
+        roomLatest[room] = id;
         
-        userListRequests[userListRequestId] = entry;
+        console.log('latest', roomLatest);
         
-        // Send message to master to request user list
-        requestUserList({
-            userListRequestId: userListRequestId
-        });
+        //console.log('worker received message', msg);
+        serviceWaitQueue(msg.roomActivity);
     });
 
+    // Create a room
+    app.post('/api/wschat/rooms', jsonParser, function(req, res) {
+        //console.log('posting', req.body);
+        
+        var name = req.body.name;
+        
+        // create a room
+        chatdb.createRoom(null, name).then(function(roomId) {
+            res.header('Location', '/api/wschat/rooms/' + roomId);
+            res.status(201).send();
+        }, makeErrorSender(res));
+    });
+
+    // Get list of rooms
+    app.get('/api/wschat/rooms', function(req, res) {
+        chatdb.getRooms().then(function(rooms) {
+            res.send(rooms);
+        }, makeErrorSender(res));
+    });
+
+    // Get specific room
+    app.get('/api/wschat/rooms/:room', function(req, res) {
+        var room = +req.params.room;
+        
+        chatdb.getRoom(room)
+        .then(function(record) {
+            res.send(record);
+        }, makeErrorSender(res));
+    });
+    
+    // delete a room
+    app.delete('/api/wschat/rooms/:room', function(req, res) {
+        var room = +req.params.room;
+        
+        // create a room
+        chatdb.deleteRoom(room, req.name).then(function(roomId) {
+            res.redirect('/api/wschat/rooms/' + roomId).end();
+        }, makeErrorSender(res));
+    });
+
+    // Send immediate empty response
     app.get('/api/wschat/message/ping', function(req, res) {
         res.send();
     });
 
-    app.get('/api/wschat/message/stream', function(req, res) {
+    app.get('/api/wschat/rooms/:room/message/stream', function(req, res) {
         var since = req.query.since && +req.query.since || 0,
-            firstMessage = messages && messages[0],
-            lastMessage = messages && messages[messages.length-1],
-            waiter,
+            room = +req.params.room,
             hint;
         
-        console.log('incoming since', since);
+        //console.log('incoming since', since);
         
-        if (since < 0 && firstMessage)
-            since = +firstMessage.id;
-        
-        console.log('since=', typeof since, since);
-        
-        if (since !== undefined && 
-                lastMessage &&
-                +lastMessage.id > since) {
-            // Send response immediately
-            sendMessagesSince(res, since, defaultLimit);
-            return;
+        //console.log('since=', typeof since, since);
+        if (since === roomLatest[room]) {
+            console.log('eager wait because', 
+                since, '===', roomLatest[room]);
+            waitForRoomActivity(res, room, since);
+        } else {
+            chatdb.getSomeFromId(room, since || -1, defaultLimit)
+            .then(function(messages) {
+                //console.log('got some', messages.length);
+
+                if (!messages || !messages.length) {
+                    waitForRoomActivity(res, room, since);
+                } else {
+                    res.send({
+                        messages: messages
+                    });
+                }
+            });
         }
-
-        waiter = {
-            res: res,
-            since: since,
-            timeout: 0
-        };
-
-        // Remember where this entry might be in the queue
-        hint = waitQueue.length;
-        waitQueue.push(waiter);
-
-        res.setHeader('Connection', 'close');
-
-        // If connection closes abruptly, remove from queue
-        req.on('close', requestClosed);
         
-        req.setTimeout(5 * 60 * 1000);
+        function waitForRoomActivity(res, room, since) {
+            var waitQueue,
+                waiter;
+            
+            waiter = {
+                res: res,
+                since: since,
+                timeout: 0
+            };
 
-        // Timeout in 3.5 minutes
-        waiter.timeout = setTimeout(requestTimedOut, 210000, waiter);
-
-        function requestClosed() {
-            if (waiter.timeout !== undefined) {
-                clearTimeout(waiter.timeout);
-                waiter.timeout = undefined;
+            if (!waitQueues[room]) {
+                console.log('creating queue for room', room);
             }
 
-            removeFromQueue(waiter, hint);
+            // Get room queue or create new queue
+            waitQueue = waitQueues[room] ||
+                (waitQueues[room] = []);
+
+
+            // Remember where this entry might be in the queue
+            hint = waitQueue.length;
+            waitQueue.push(waiter);
+
+            res.setHeader('Connection', 'close');
+
+            // If connection closes abruptly, remove from queue
+            req.on('close', requestClosed);
+
+            req.setTimeout(5 * 60 * 1000);
+
+            // Timeout in 3.5 minutes
+            waiter.timeout = setTimeout(requestTimedOut, 210000, 
+                waitQueue, waiter);
+
+            function requestClosed() {
+                if (waiter.timeout !== undefined) {
+                    clearTimeout(waiter.timeout);
+                    waiter.timeout = undefined;
+                }
+
+                removeFromQueue(waitQueue, waiter, hint);
+            }
         }
         
-        function requestTimedOut(waiter) {
+        function requestTimedOut(waitQueue, waiter) {
             waiter.timeout = undefined;
             
-            if (removeFromQueue(waiter, hint))
+            if (removeFromQueue(waitQueue, waiter, hint))
                 waiter.res.send({});
         }
     });
 
-    app.post('/api/wschat/message/stream', jsonParser, function(req, res) {
-        var sender = req.body.sender,
+    app.post('/api/wschat/rooms/:room/message/stream', jsonParser, 
+    function(req, res) {
+        var room = +req.params.room,
+            sender = req.body.sender,
+            replyTo = req.body.replyTo || null,
             message = req.body.message,
             record;
+        
+        if (!sender || !message) {
+            res.status(400).send('Bad request');
+            return;
+        }
 
         record = {
-            id: 0,
+            roomId: room,
             sender: sender,
+            replyTo: replyTo,
             message: message
         };
+        
+        //console.log('posting', record);
         
         // Update other servers
         sendMessageToMaster({
@@ -269,6 +287,13 @@ function worker(cluster, app, jsonParser) {
         });
     });
     
+    function makeErrorSender(res) {
+        return function(err) {
+            console.error(err);
+            res.status(500).send(err);
+        };
+    }
+    
     function allFileContent(prefix, files) {
         var index = 0,
             result = {};
@@ -277,7 +302,7 @@ function worker(cluster, app, jsonParser) {
             var name = files[index++],
                 basename = path.basename(name),
                 fullname = prefix + emojiDir + name;
-            console.log('allFileContent:reading:', fullname);
+            //console.log('allFileContent:reading:', fullname);
             fs.readFile(fullname, 'utf8', function(err, file) {
                 if (err) {
                     reject(err);
@@ -297,54 +322,62 @@ function worker(cluster, app, jsonParser) {
         });
     }
     
-    function removeFromQueue(waiter, hint) {
+    function removeFromQueue(waitQueue, waiter, hint) {
         if (hint === undefined || waitQueue[hint] !== waiter)
             hint = waitQueue.indexOf(waiter);
         if (hint >= 0)
             return waitQueue.splice(hint, 1);
     }
     
-    function serviceWaitQueue() {
-        waitQueue.splice(0, waitQueue.length).forEach(function(waiter) {
+    function serviceWaitQueue(room) {
+        console.assert(room);
+        var waitQueue = waitQueues[room];
+        if (!waitQueue)
+            console.log('no queue for room', room);
+        else
+            console.log('servicing queue for room', room, waitQueue.length);
+        waitQueue && waitQueue.splice(0, waitQueue.length)
+        .forEach(function(waiter) {
             if (waiter.timeout) {
                 clearTimeout(waiter.timeout);
                 waiter.timeout = undefined;
             }
             
-            sendMessagesSince(waiter.res, 
+            sendMessagesSince(waiter.res, room,
                 waiter.since, defaultLimit);
         });
     }
-    
-    function appendRecord(record) {
-        messages.push(record);
 
-        if (messages.length > messageLimit)
-            messages.shift();
-    }
-
-    function sendMessagesSince(res, since, limit) {
-        var lastIndex = messages.length-1,
-            lastMessage = messages[lastIndex],
-            index,
-            end;
-
-        if (since <= 1) {
-            index = 0;
-        } else {
-            // Search back until we find starting point
-            for (index = lastIndex; 
-                index > 0 &&
-                messages[index-1].id > since; 
-                --index);
-        }
+    function sendMessagesSince(res, room, since, limit) {
+        var messages;
         
         // Try to get client aligned on id that starts with
         // a multiple of 32, for maximum cache hits
-        limit = since < 0 ? 64 : (((since + 64) & -64) - since);
-
-        res.send({
-            messages: messages.slice(index, index + limit)
-        });
-    }            
+        limit = since < 0 ? limit : (((since + defaultLimit) & -defaultLimit) - since);
+        
+        return chatdb.getSomeFromId(
+                room, since, limit).then(function(messages) {
+            var lastMessage,
+                roomLatestId;
+            
+            if (messages) {
+                //console.log('sending some from id', messages);
+                res.send({
+                    messages: messages
+                });
+                
+                console.dir(roomLatest);
+                
+                // Update latest if new data has higher id for this room
+                lastMessage = messages[messages.length - 1];
+                roomLatestId = roomLatest[room];
+                if (!roomLatestId ||
+                    +lastMessage.id > roomLatestId) {
+                    roomLatest[room] = +lastMessage.id;
+                }
+            }
+            
+            return messages && messages.length && messages || null;
+        }, util.makeErrorDumper('sendMessagesSince'));
+    }
 };

@@ -1,8 +1,11 @@
 "use strict";
 
 var Sequelize = require('sequelize'),
+    util = require('./util'),
+    authdb = require('./authdb'),
     dbconfig = require('./chatserverconfig'),
     db,
+    ChatRoom,
     ChatMessage;
 
 db = new Sequelize(
@@ -11,7 +14,18 @@ db = new Sequelize(
     dbconfig.chatMsg.password,
     dbconfig.chatMsg.options);
 
-db.sync({force: false});
+ChatRoom = db.define('room', {
+    id: {
+        primaryKey: true,
+        type: Sequelize.BIGINT,
+        autoIncrement: true
+    },
+    name: {
+        type: Sequelize.STRING(20)
+    }
+});
+
+//ChatRoom.belongsTo(authdb.db.User);
 
 ChatMessage = db.define('chatmsg', {
     id: {
@@ -19,49 +33,121 @@ ChatMessage = db.define('chatmsg', {
         type: Sequelize.BIGINT,
         autoIncrement: true
     },
-    sender: Sequelize.STRING(64),
-    message: Sequelize.STRING(4000)
+    sender: {
+        type: Sequelize.STRING(64)
+    },
+    message: {
+        type: Sequelize.STRING(4000)
+    }
 });
+
+ChatMessage.belongsTo(ChatMessage, {
+    as: 'replyTo'
+});
+
+ChatMessage.belongsTo(ChatRoom);
 
 module.exports.insertMessage = insertMessage;
 module.exports.getLatest = getLatest;
 module.exports.getSomeFromId = getSomeFromId;
 module.exports.getOlderById = getOlderById;
+module.exports.createRoom = createRoom;
+module.exports.getRooms = getRooms;
+module.exports.sync = sync;
+module.exports.createDefaultRoom = createDefaultRoom;
 
-function insertMessage(msg) {
-    return ChatMessage.create(msg.record, {
-        raw: true
+function sync(force) {
+    return db.sync({force: force});
+}
+
+function createDefaultRoom() {
+    return ChatRoom.create({
+        name: 'default'
     });
 }
 
-function getLatest(limit) {
+function getRooms(offset, limit) {
+    return ChatRoom.findAll({
+        offset: offset,
+        limit: limit,
+        raw: true
+    }).then(util.makeResultDumper('getRooms'),
+        util.makeErrorDumper('getRooms'));
+}
+
+function createRoom(owner, name) {
+    console.log('createRoom wtf', arguments);
+    return ChatRoom.create({
+        name: name,
+        user: owner
+    }).then(function(record) {
+        return record.get('id');
+    }).then(util.makeResultDumper('createRoom'),
+        util.makeErrorDumper('createRoom'));
+}
+
+function insertMessage(msg) {
+    //console.log('insert msg', msg);
+    return ChatMessage.create(msg.record).then(function(record) {
+        return record.toJSON();
+    }).then(util.makeResultDumper('insertMessage'),
+        util.makeErrorDumper('insertMessage'));
+}
+
+function getLatest(room, limit) {
+    //console.log('getting latest for room', typeof room, room);
     return ChatMessage.findAll({
         order: 'id DESC',
         offset: 0,
         limit: limit,
-        raw: true
-    });
+        raw: true,
+        include: [
+            { model: ChatRoom, required: false }
+        ],
+        where: {
+            roomId: room
+        }
+    }).then(function(records) {
+        return records.reverse();
+    }).catch(util.makeErrorDumper('getLatest'));
 }
 
 // Returns limit records where id >= `id`
-function getSomeFromId(id, limit) {
+function getSomeFromId(room, id, limit) {
+    if (id < 0) {
+        //console.log('getting latest');
+        return getLatest(room, limit);
+    }
+    
+    console.dir(room);
+    
     return ChatMessage.findAll({
         where: {
+            roomId: room,
             id: {
-                gte: id
+                $gt: id
             }
         },
-        order: 'id DESC',
+        include: [
+            { model: ChatRoom, required: false }
+        ],
+        order: 'room,id DESC',
         offset: 0,
         limit: limit,
         raw: true
-    });
+    }).then(function(records) {
+        return records.reverse();
+    }).then(util.makeResultDumper('getSomeFromId'),
+        util.makeErrorDumper('getSomeFromId'));
 }
 
 // Returns limit records where id < `id`
-function getOlderById(id, limit) {
+function getOlderById(room, id, limit) {
     return ChatMessage.findAll({
         where: {
+            roomId: {
+                eq: room
+            },
             id: {
                 lt: id
             }
@@ -70,5 +156,8 @@ function getOlderById(id, limit) {
         offset: 0,
         limit: limit,
         raw: true
+    }).then(function(records) {
+        return records.reverse();
     });
 }
+
