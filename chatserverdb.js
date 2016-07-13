@@ -45,7 +45,9 @@ ChatMessage.belongsTo(ChatMessage, {
     as: 'replyTo'
 });
 
-ChatMessage.belongsTo(ChatRoom);
+ChatMessage.belongsTo(ChatRoom, {
+    unique: ['id', 'roomId']
+});
 
 module.exports.insertMessage = insertMessage;
 module.exports.getLatest = getLatest;
@@ -53,6 +55,7 @@ module.exports.getSomeFromId = getSomeFromId;
 module.exports.getOlderById = getOlderById;
 module.exports.createRoom = createRoom;
 module.exports.getRooms = getRooms;
+module.exports.getRoom = getRoom;
 module.exports.sync = sync;
 module.exports.createDefaultRoom = createDefaultRoom;
 
@@ -71,8 +74,16 @@ function getRooms(offset, limit) {
         offset: offset,
         limit: limit,
         raw: true
-    }).then(util.makeResultDumper('getRooms'),
-        util.makeErrorDumper('getRooms'));
+    }).catch(util.makeErrorDumper('getRooms'));
+}
+
+function getRoom(room) {
+    return ChatRoom.findOne({
+        where: {
+            id: +room
+        },
+        raw: true
+    }).catch(util.makeErrorDumper('getRoom ' + +room));
 }
 
 function createRoom(owner, name) {
@@ -99,16 +110,19 @@ function getLatest(room, limit) {
     return ChatMessage.findAll({
         order: 'id DESC',
         offset: 0,
-        limit: limit,
+        limit: limit*4,
         raw: true,
         include: [
-            { model: ChatRoom, required: false }
+            {
+                model: ChatRoom,
+                attributes: []
+            }
         ],
         where: {
             roomId: room
         }
     }).then(function(records) {
-        return records.reverse();
+        return records.reverse().slice(0, limit);
     }).catch(util.makeErrorDumper('getLatest'));
 }
 
@@ -119,8 +133,6 @@ function getSomeFromId(room, id, limit) {
         return getLatest(room, limit);
     }
     
-    console.dir(room);
-    
     return ChatMessage.findAll({
         where: {
             roomId: room,
@@ -129,7 +141,10 @@ function getSomeFromId(room, id, limit) {
             }
         },
         include: [
-            { model: ChatRoom, required: false }
+            {
+                model: ChatRoom, 
+                attributes: []
+            }
         ],
         order: 'room,id DESC',
         offset: 0,
@@ -137,8 +152,7 @@ function getSomeFromId(room, id, limit) {
         raw: true
     }).then(function(records) {
         return records.reverse();
-    }).then(util.makeResultDumper('getSomeFromId'),
-        util.makeErrorDumper('getSomeFromId'));
+    }).catch(util.makeErrorDumper('getSomeFromId'));
 }
 
 // Returns limit records where id < `id`

@@ -26,8 +26,7 @@
 }
 
 .chat-scrollable {
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: auto;
 }
 
 .chat-flex {
@@ -86,10 +85,6 @@
 }
 
 .chat-container .chat-message {
-    /* word-wrap: break-word; */
-}
-
-.chat-container .chat-text p {
     word-wrap: break-word;
 }
 
@@ -111,7 +106,7 @@
 
 
 .chat-add-emoji img {
-    height: 1.5em;
+    height: 18px;
     vertical-align: middle;
 }
 
@@ -418,7 +413,6 @@
     cursor: default;
 }
 
-.chat-haccordian > .chat-accordian-title > .chat-accordian-title-text,
 .chat-sideways {
     position: absolute;
     transform: rotate(90deg);
@@ -517,15 +511,6 @@
 .chat-room {
     margin-right: 2px;
     width: 0;
-    /* min-width: 256px; */
-}
-
-.chat-container .chat-join-room-button {
-    font-weight: normal;
-}
-
-.chat-container .chat-join-room-button.chat-room-joined {
-    font-weight: bold;
 }
 
 .chat-room-list-pane {
@@ -585,8 +570,8 @@ button.chat-popout-button {
     box-shadow: 3px 3px rgba(0,0,0,0.2);
 }
 
-.chat-join-room-list {
-    min-width: 119px;
+.chat-room-list {
+    min-width: 100px;
 }
 
 .chat-join-room-list {
@@ -597,12 +582,12 @@ button.chat-popout-button {
 
 
 .chat-join-room-button {
-    margin: 1px 2px;
+    margin: 2px;
     background: #CCC;
-    min-width: calc(99% - 2px);
+    display: block;
+    width: 96%;
 }
 
 .chat-join-room-entry {
     display: block;
 }
-   

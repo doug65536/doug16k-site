@@ -1,0 +1,349 @@
+@import url(https://fonts.googleapis.com/css?family=Amiri:400,400italic,700,700italic);
+@import url(https://fonts.googleapis.com/css?family=Arimo);
+
+.ui-fill {
+    position: absolute;
+}
+
+.ui-fill,
+.ui-fill-width {
+    left: 0;
+    right: 0;
+}
+
+.ui-fill,
+.ui-fill-height {
+    top: 0;
+    bottom: 0;
+}
+
+.ui-clip {
+    overflow: hidden;
+}
+
+.ui-scrollable {
+    overflow: auto;
+}
+
+.ui-flex {
+    position: relative;
+    display: flex;
+}
+
+.ui-fixed {
+    position: fixed;
+    padding: 2px;
+    box-sizing: border-box;
+}
+
+.ui-row {
+    flex-direction: row;
+}
+
+.ui-column {
+    flex-direction: column;
+}
+
+.ui-wrap {
+    flex-wrap: wrap;
+}
+
+.ui-nowrap {
+    flex-wrap: nowrap;
+}
+
+.ui-grow {
+    flex-grow: 1;
+}
+
+.ui-shrink {
+    flex-shrink: 1;
+}
+
+.ui-noshrink {
+    flex-shrink: 0;
+}
+
+.ui-nogrow {
+    flex-grow: 0;
+}
+
+.ui-text-top {
+    vertical-align: top;
+}
+
+.ui-container p {
+    margin: 0;
+}
+
+.ui-container .ui-messages {
+    background: white;
+}
+
+.ui-container .ui-message {
+    word-wrap: break-word;
+}
+
+.ui-code {
+    font-family: monospace;
+    font-size: 0.9em;
+    margin: 0px;
+    padding: 2px 6px;
+    background: #E6E6E6;
+}
+
+.ui-container button {
+    outline: none;
+    border: none;
+    min-height: 28px;
+    padding: 3px;
+    background: #CCC;
+}
+
+.ui-scroll {
+    margin: 5px 0px;
+}
+
+.ui-flip-vertical {
+    transform: scaleY(-1);
+}
+
+.ui-sidebar li a:hover {
+    color: #111;
+    background-image: linear-gradient(to bottom, 
+        rgba(192, 208, 224, 0.0), 
+        rgba(192, 208, 224, 0.5), 
+        rgba(192, 208, 224, 0.0));
+    font-size: 1.2em;
+    border-radius: 8px;
+}
+
+.ui-load {
+    animation: ui-load-anim 0.5s ease-out;
+}
+
+.ui-popup {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.9);
+    bottom: 100%;
+    right: 20px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border: solid black 1px;
+    cursor: default;
+}
+
+.ui-popup-menuitem {
+    position: relative;
+}
+
+.ui-popup-menu {
+    right: 100%;
+    flex-flow: row-reverse wrap;
+    position: absolute;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    width: 800px;
+    padding: 3px;
+    border: solid black 1px;
+    overflow: auto;
+}
+
+.ui-popup-menuitem {
+    position: relative;
+    padding: 8px;
+    text-align: left;
+}
+
+.ui-popup-menuitem:hover,
+.ui-popup-menuitem.ui-holdopen,
+.ui-popup-menuitem img:hover {
+    background-color: #CEF;
+}
+
+.ui-popup-menuitem img {
+    padding: 3px;
+    height: 27px;
+    width: 27px;
+}
+
+/* chat menu hold open */
+
+.ui-popup-menuitem .ui-popup-menu {
+    display: none;
+}
+.ui-popup-menuitem.ui-holdopen .ui-popup-menu,
+.ui-popup-menuitem:hover .ui-popup-menu {
+    display: flex;
+}
+
+.ui-container a,
+.ui-container a:active,
+.ui-container a:visited {
+    text-decoration: none;
+}
+
+.ui-overlay {
+    display: flex;
+    flex-flow: column-reverse nowrap;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.95);
+    vertical-align: middle;
+    text-align: center;
+}
+
+.ui-sidebar label,
+.ui-sidebar label select {
+    display: block;
+    white-space: nowrap;
+}
+
+.ui-sidebar label {
+    margin: 4px 4px;
+}
+
+.ui-sidebar label:focus {
+    outline: dotted 1px;
+}
+
+.ui-sidebar label select {
+    width: 100%;
+    padding: 4px;
+}
+
+.ui-sidebar ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* ================================================== */
+
+.ui-accordian > .ui-accordian-title {
+    width: 100%;
+    text-align: left;
+}
+
+.ui-accordian > .ui-accordian-title,
+.ui-haccordian > .ui-accordian-title {
+    cursor: default;
+}
+
+.ui-sideways {
+    position: absolute;
+    transform: rotate(90deg);
+    transform-origin: 0% 50%;
+    left: 50%;
+    white-space: nowrap;
+}
+
+/* opened and closed accordian label colors */
+
+.ui-accordian.ui-accordian-opened > .ui-accordian-title,
+.ui-haccordian.ui-accordian-opened > .ui-accordian-title {
+    color: #222;
+}
+
+.ui-accordian.ui-accordian-closed > .ui-accordian-title,
+.ui-haccordian.ui-accordian-closed > .ui-accordian-title {
+    color: #888;
+}
+
+/* opened and closed indication */
+
+.ui-accordian > .ui-accordian-title:before,
+.ui-haccordian > .ui-accordian-title:before {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    text-align: center;
+}
+
+/* vertical and horizontal accordian have opposite symbols */
+
+.ui-accordian.ui-accordian-opened > .ui-accordian-title:before,
+.ui-haccordian.ui-accordian-closed > .ui-accordian-title:before {
+    content: "\25BC";
+}
+
+.ui-accordian.ui-accordian-closed > .ui-accordian-title:before,
+.ui-haccordian.ui-accordian-opened > .ui-accordian-title:before {
+    content: "\25BA";
+}
+
+.ui-haccordian > .ui-accordian-content,
+.ui-accordian > .ui-accordian-content {
+    background: #DDD;
+}
+
+/* keep the horizontal padding to make size consistent */
+
+.ui-accordian.ui-accordian-closed > .ui-accordian-content {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.ui-accordian.ui-accordian-closed > .ui-accordian-content {
+    height: 0px;
+    overflow: hidden;
+}
+
+/* */
+
+.ui-haccordian {
+}
+
+.ui-accordian > .ui-accordian-title,
+.ui-haccordian > .ui-accordian-title {
+    background: #CCC;
+}
+
+.ui-haccordian > .ui-accordian-title {
+    width: 26px;
+    margin-right: 0px;
+    font-size: 0.9em;
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.ui-haccordian.ui-accordian-closed > .ui-accordian-content {
+    max-width: 0;
+    display: none;
+}
+
+.ui-haccordian.ui-accordian-closed {
+    max-width: 26px;
+}
+
+.ui-room.ui-haccordian > .ui-accordian-title {
+    cursor: ew-resize;
+}
+
+.ui-haccordian > .ui-accordian-title:before {
+    left: 6px;
+    position: relative;
+}
+
+.ui-room {
+    margin-right: 2px;
+    width: 0;
+}
+
+.ui-room-list-pane {
+    margin-right: 2px;
+}
+
+button.ui-popout-button {
+    cursor: pointer;
+    margin: 2px;
+    background: #CCC;
+}
+
+.ui-popout-container {
+    position: absolute;
+    background: #DDD;
+    padding: 2px;
+    border: solid #DDD 1px;
+    box-shadow: 3px 3px rgba(0,0,0,0.2);
+}

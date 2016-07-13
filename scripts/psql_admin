@@ -1,0 +1,4 @@
+#!/bin/bash
+sudo -Hi -u postgres psql chatdb
+
+

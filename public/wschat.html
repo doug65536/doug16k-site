@@ -1,9 +1,41 @@
 <div class="chat-container chat-flex chat-row chat-fixed chat-fill">
+    <div class="chat-room-list-pane chat-flex chat-row 
+         chat-nogrow chat-noshrink
+         chat-haccordian chat-accordian-opened">
+        <div class="chat-accordian-title">
+            <div class="chat-accordian-title-text">Rooms</div>
+        </div>
+        <div class="chat-accordian-content 
+             chat-column chat-flex chat-grow
+             chat-scrollable">
+            <button class="chat-popout-button">Create</button>
+            <div class="chat-popout-container chat-hidden">
+                <label>
+                    Name
+                    <input>
+                </label>
+                <button class="chat-create-room">Create</button>
+            </div>
+            
+            <div class="chat-accordian-content chat-flex chat-column">
+                <div class="chat-accordian chat-accordian-closed">
+                    <button class="chat-accordian-title">
+                        <span class="chat-accordian-title-text">Join Room</span>
+                    </button>
+                    <div class="chat-accordian-content chat-join-room-list">
+                        <div class="chat-join-room-entry">
+                            <button class="chat-join-room-button"></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="chat-rooms chat-flex chat-row chat-grow chat-shrink">
         <div class="chat-room chat-haccordian chat-accordian-opened
              chat-flex chat-row chat-grow chat-shrink">
             <div class="chat-accordian-title">
-                <div class="chat-sideways">
+                <div class="chat-room-title chat-accordian-title-text">
                     Chat: Prototype room
                 </div>
             </div>
@@ -34,7 +66,7 @@
     <div class="chat-sidebar chat-haccordian chat-accordian-opened
          chat-flex chat-row chat-noshrink">
         <div class="chat-accordian-title">
-            <div class="chat-sideways">Options</div>
+            <div class="chat-accordian-title-text">Options</div>
         </div>
         <div class="chat-accordian-content chat-flex chat-column chat-scrollable">
             <div class="chat-accordian chat-accordian-closed">
@@ -70,12 +102,6 @@
                         <input type="checkbox" 
                                class="chat-show-timestamp">Timestamp
                     </label>
-                </div>
-            </div>
-            <div class="chat-accordian chat-accordian-opened">
-                <button class="chat-accordian-title">Joined Rooms</button>
-                <div class="chat-accordian-content">
-                    <label>Prototype room</label>
                 </div>
             </div>
             <div class="chat-accordian chat-accordian-opened">

@@ -17,7 +17,11 @@
     "dhparam": "^1.0.3",
     "express": "^4.11.1",
     "helmet": "^2.1.0",
+    "less": "^2.7.1",
     "pg": "^4.5.6",
     "sequelize": "^3.23.3"
+  },
+  "devDependencies": {
+    "mocha": "^2.5.3"
   }
 }

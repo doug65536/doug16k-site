@@ -44,12 +44,14 @@ function worker(cluster, app, jsonParser) {
     var authdb = require('./authdb'),
         authRateLimiter = rateLimiter(5000);
     
-    app.post('/api/auth', function(req, res) {
+    app.post('/api/auth', jsonParser, function(req, res) {
         authRateLimiter(req, res, function(req, res) {
-            var username = req.params.username,
-                password = req.params.password;
+            var username = req.body.username,
+                password = req.body.password;
             
-            
+            authdb.checkPassword(username, password).then(function(result) {
+                
+            });
         });
     });
     

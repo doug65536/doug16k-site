@@ -7,6 +7,11 @@
     
     polyfills();
     
+    $.fn.assert = function(message) {
+        console.assert(this.length);
+        return this;
+    };
+    
     var localStorage = window.localStorage || {},
         Notif = window.webkitNotification || 
             window.mozNotification ||
@@ -14,16 +19,30 @@
     
     var chatContainer = $('.chat-container'),
     
-        chatRooms = $('.chat-rooms', chatContainer),
-    
-        chatRoom = $('.chat-room', chatRooms).remove(),
+        netProblem = false,
+        abortUpdate,
+        updateStarted,
+
+        chatMessage = $('.chat-message', chatRoom).remove(),
+        chatSender = $('.chat-sender', chatMessage),
+        chatText = $('.chat-text', chatMessage),
+        chatTime = $('.chat-timestamp', chatMessage),
         
-        chatSidebar = $('.chat-sidebar', chatContainer),
-        chatFont = $('.chat-font', chatSidebar),
-        chatFontSize = $('.chat-font-size', chatSidebar),
-        chatDesktopNotification = $('.chat-desktop-notification', chatSidebar),
-        chatSound = $('.chat-sound', chatSidebar),
-        chatShowTimestamp = $('.chat-show-timestamp', chatSidebar),
+        chatJoinRoomList = $('.chat-join-room-list').assert(),
+        chatJoinRoomEntry = $('.chat-join-room-entry', chatJoinRoomList)
+            .assert().remove(),
+        
+        chatRooms = $('.chat-rooms', chatContainer).assert(),
+    
+        chatRoom = $('.chat-room', chatRooms).assert().remove(),
+        
+        chatSidebar = $('.chat-sidebar', chatContainer).assert(),
+        chatFont = $('.chat-font', chatSidebar).assert(),
+        chatFontSize = $('.chat-font-size', chatSidebar).assert(),
+        chatDesktopNotification = $('.chat-desktop-notification', chatSidebar)
+            .assert(),
+        chatSound = $('.chat-sound', chatSidebar).assert(),
+        chatShowTimestamp = $('.chat-show-timestamp', chatSidebar).assert(),
         
         fontLookup = initFontLookup(chatFont),
         
@@ -34,690 +53,28 @@
         problemIndicator = $('.chat-problem'),
         username,
         
-        messageLimit = 128,
+        messageLimit = 256,
         emojiUI,
         allowSound = false,
         minDelayBetweenSounds = 4000,
         notificationSound,
         notificationSoundUrl = 'vendor/notification-sound.mp3',
         
-        emojiRequest = getEmojiData(),
+        emojiDefer = { resolve: null, reject: null },
+        emojiPromise = new Promise(function(resolve, reject) {
+            emojiDefer.resolve = resolve;
+            emojiDefer.reject = reject;
+        }),
         markupRenderTable = makeMarkupRenderTable(),
         rooms = {};
     
-    function roomInstance(chatRoom, room, name) {
-        var api,
-            chatMessages = $('.chat-messages', chatRoom),        
-
-            chatMessage = $('.chat-message', chatRoom).remove(),
-            chatSender = $('.chat-sender', chatMessage),
-            chatText = $('.chat-text', chatMessage),
-            chatTime = $('.chat-timestamp', chatMessage),
-
-            chatFooter = $('.chat-footer', chatRoom),
-            chatEntry = $('.chat-entry', chatFooter),
-            chatUsername = $('.chat-username', chatFooter),
-            chatSend = $('.chat-send', chatFooter),
-            chatPickEmoji = $('.chat-pick-emoji', chatFooter),
-            
-            lastKnownMessage = -1,
-            currentMessage = -1,
-            preservedMessage;
-
-        api = {
-            usernameChangeHandler: usernameChangeHandler,
-            pickEmojiHandler: pickEmojiHandler,
-            sendCurrentMessage: sendCurrentMessage,
-            chatKeypressHandler: chatKeypressHandler,
-            chatKeydownHandler: chatKeydownHandler,
-            chatEmojiClickHandler: chatEmojiClickHandler
-        };
-        
-        rooms[room] = api;
-        
-        chatRooms.append(chatRoom);
-        chatRoom.attr('data-chat-room', room);
-
-        username = localStorage.username;
-
-        if (!username) {
-            assignUsername()
-            .then(function uniqueUsernameResponseHandler(response) {
-                if (response.username)
-                    return setUsername(response.username);
-            });
-        } else {
-            setUsername(username);
-        }
-
-        emojiRequest
-        .then(function(emojies) {
-            update(lastKnownMessage);
-        }).then(function() {
-            chatEntry.focus();
+    // deferred to promise
+    function d2p(deferred) {
+        console.assert(typeof deferred.then === 'function');
+        return new Promise(function(resolve, reject) {
+            deferred.then(resolve, reject);
         });
-        
-        return api;
-
-        function createMessageIndirect(data) {
-            var message,
-                codeFragments,
-                parts,
-                lastEnd,
-                input,
-                i,
-                id,
-                part,
-                links, linkText, linkUrl,
-                timestamp = +Date.parse(data.updatedAt),
-                message = renderMessage(data.message);
-
-            id = 'chat-' + data.id;
-
-            chatMessage.attr({
-                'data-messageid': data.id,
-                'data-sender': data.sender,
-                'data-timestamp': timestamp,
-                'data-message': data.message,
-                'id': id
-            });
-            chatMessage.toggleClass('chat-message-own', data.sender === username);
-            chatMessage.toggleClass('chat-message-not-own', data.sender !== username);
-
-            chatTime.empty().append(renderTimestamp(id, timestamp));
-
-            chatSender.text(data.sender);
-
-            chatText.empty().append(message);
-
-            return chatMessage.clone();
-        }
-
-        function renderTimestamp(id, ts) {
-            var date = new Date(ts),
-                datetime,
-                text,
-                textnode,
-                span;
-
-            datetime = [
-                date.getFullYear(),
-                date.getMonth() + 1,
-                date.getDate(),
-                date.getHours(),
-                date.getMinutes(),
-                date.getSeconds(),
-                date.getMilliseconds(),
-                0,
-                0
-            ];
-
-            datetime[7] = datetime[3] % 12;
-            datetime[7] = datetime[7] || 12;
-            datetime[8] = datetime[3] >= 12 ? 'pm' : 'am';
-
-            text = [
-                //'[', 
-                (' ' + datetime[7]).substr(-2), 
-                ':', 
-                ('0' + datetime[4]).substr(-2), 
-                datetime[8], 
-                //']'
-            ].join('');
-
-            return $('<a/>', {
-                href: '#' + id,
-                'title': String(new Date(ts)),
-                text: text,
-                target: '_blank'
-            });
-        }
-
-        // Returns an array of elements
-        function renderMessage(input) {
-            var //matches = reverseMatches(/(`+)(.*?)\1/g, input),
-                result = [input],
-                didany;
-
-            // Keep applying the first rule until no more rules ran
-            // while loop empty body just repeats its condition
-            while (result.some(function renderProcessFragment(item, index, result) {
-                if (typeof item !== 'string')
-                    return;
-
-                return markupRenderTable.some(function renderApplyRule(entry) {
-                    var match = item.match(entry.re),
-                        before,
-                        replacement,
-                        after;
-                    if (!match)
-                        return;
-
-                    before = item.substr(0, match.index);
-                    after = item.substr(match.index + match[0].length);
-                    replacement = entry.handler(match);
-
-                    // Remove the modified node
-                    result.splice(index, 1);
-
-                    // If there was text before
-                    if (after)
-                        result.splice(index, 0, after);
-
-                    if (replacement)
-                        result.splice(index, 0, replacement);
-
-                    // If there was text after
-                    if (before)
-                        result.splice(index, 0, before);
-
-                    return true;
-                });
-            }));
-
-            return result.filter(function renderFilterEmptyString(node) {
-                // Get rid of empty string fragments
-                return node !== '';
-            }).map(function renderWrapStringsInSpans(node) {
-                // Wrap strings in spans
-                var span;
-                if (typeof node === 'string') {
-                    return $('<span/>', {
-                        'class': 'chat-text-span',
-                        text: node
-                    });
-                }
-                return node;
-            }).reduce(function renderAppendToParagraph(parent, node) {
-                // Append everything to a paragraph
-                parent.append(node);
-                return parent;
-            }, $('<p/>'));
-        }
-
-        // Infinite get request, never resolves,
-        // endlessly gets more messages
-        // but might reject
-        function update(lastKnownMessage, backoff) {
-            return $.getJSON({
-                url: '/api/wschat/rooms/' + room + '/message/stream',
-                data: {
-                    since: lastKnownMessage
-                },
-                beforeSend: function updateBeforeSendHandler(xhr) {
-                    xhr.setRequestHeader('X-Auth-Token', '42');
-                },
-                timeout: 36 * 6 * 1000
-            }).then(function updateResponseHandler(response) {
-                if (response.messages) {
-                    var items,
-                        animClassName,
-                        frag = $(window.document.createDocumentFragment()),
-                        mentionRegex = matchWholeWordRegex('@' + username);
-                    animClassName = response.messages.length > 8 ? 
-                        'chat-load' : 'chat-reveal';
-                    items = response.messages.map(function updateMapMessage(message) {
-                        var item;
-
-                        lastKnownMessage = Math.max(
-                            lastKnownMessage,
-                            message.id);
-                        item = createMessageIndirect(message);
-                        item.addClass(animClassName);
-                        frag.prepend(item);
-
-                        if (mentionRegex.test(message.message)) {
-                            if (Notif && 
-                                localStorage.chatNotification !== 'false') {
-                                try {
-                                    new Notif('doug16k.com chat', {
-                                        icon: 'vendor/emojione.com/1f642.svg',
-                                        body: message.sender + 
-                                            ' mentioned you\n' + 
-                                            message.message
-                                    });
-                                } catch (err) {
-                                }
-                            }
-
-                            playSound(notificationSoundUrl);
-                        }
-
-                        return item.get(0);
-                    });
-                    chatMessages.prepend(frag);
-                    chatMessages.children().slice(messageLimit).remove();
-                }
-                return update(lastKnownMessage);
-            }, function updateErrorHandler(err) {
-                // Exponential backoff from 200ms up to 10s per retry
-                if (!backoff)
-                    netHavingProblem(true);
-
-                // Do a ping request to quickly clear error indication
-                $.get('/api/wschat/message/ping')
-                .then(function updatePingHandler() {
-                    netHavingProblem(false);
-                }, function updatePingErrorHandler() {
-                    netHavingProblem(true);
-                });
-
-                console.log('error=', err, 'backoff=', backoff);
-                setTimeout(function updateBackoffHandler() {
-                    update(lastKnownMessage,
-                        Math.min((backoff || 100) * 2, 10000));
-                }, backoff || 0);
-            }, function updateProgressHandler(progress) {
-                console.log('progress', progress);
-            });
-        }
-        
-        function usernameChangeHandler(event) {
-           username = chatUsername.val();
-            chatText.prop('disabled', 
-                !username || !username.length);
-        
-            localStorage.username = username;
-        }
-        
-        function chatKeypressHandler(event) {
-            var dir;
-
-            if (event.type === 'input') {
-                chatSend.prop('disabled', isCurrentMessageEmpty());
-                return;
-            }
-
-            switch (event.which) {
-            case 13:
-                sendCurrentMessage();
-                event.preventDefault();
-                break;
-            }
-        }
-        
-        function chatKeydownHandler(event) {
-            var messages,
-                message,
-                dir,
-                id,
-                text;
-
-            switch (event.which) {
-            case 38:    // up
-            case 40:    // down
-            case 27:    // esc
-                // Direction of message index change
-                dir = event.which === 38 ? 1 : 
-                    event.which === 40 ? -1 : 0;
-
-                event.preventDefault();
-
-                if (dir === 0) {
-                    // escape
-                    if (currentMessage !== -1) {
-                        chatEntry
-                            .val(preservedMessage)
-                            .removeClass('chat-editing');
-                        preservedMessage = '';
-                        currentMessage = -1;
-                    }
-                    return;
-                }
-
-                messages = ownMessages();
-
-                if (dir < 0 && currentMessage < 0)
-                    return;
-
-                // If pressing up from new chat message, save it
-                if (dir > 0 && currentMessage < 0)
-                    preservedMessage = chatEntry.val();
-
-                if (currentMessage < 0) {
-                    message = messages.all.first();
-                } else if (messages.selectedIndex === 0 && dir < 0) {
-                    message = $();
-                } else if ((messages.selectedIndex === 
-                        messages.length - 1) && dir > 0) {
-                    message = $();
-                } else {
-                    message = messages.all.eq(messages.selectedIndex+dir);
-                }
-                if (message.length) {
-                    text = message.attr('data-message');
-                    id = +message.attr('data-messageid');
-                    currentMessage = id;
-                    chatEntry.val(text).addClass('chat-editing');
-                } else if (dir < 0) {
-                    chatEntry.val(preservedMessage).removeClass('chat-editing');
-                    currentMessage = -1;
-                    preservedMessage = '';
-                }
-                break;
-
-            case 33:
-            case 34:
-            case 35:
-            case 36:
-                dir = event.which === 33 ? 1 : 
-                    event.which === 34 ? -1 :
-                    (event.ctrlKey && (event.which === 35)) ? -1000 :
-                    (event.ctrlKey && (event.which === 36)) ? 1000 :
-                    0;
-
-                chatMessages.scrollTop(chatMessages.scrollTop() +
-                    dir * chatMessages.innerHeight() * 0.95);
-
-                break;
-
-            }
-
-            function ownMessages() {
-                var messages,
-                    selectedIndex;
-
-                messages = chatMessages.children('.chat-message-own');
-                messages.each(function findCurrentMessage(i) {
-                    var id = +$(this).attr('data-messageid');
-                    if (id === currentMessage)
-                        selectedIndex = i;
-                });
-
-                return {
-                    all: messages,
-                    selectedIndex: selectedIndex
-                };
-            }
-        }
-        
-        function chatWheelHandler(event) {
-            event.preventDefault();
-
-            var oe = event.originalEvent,
-                delta = oe.deltaY,
-                scroll = chatMessages.scrollTop(),
-                dist = 75;
-
-            chatMessages.scrollTop(scroll -
-                Math.sign(delta) * dist);
-        }
-
-        function isCurrentMessageEmpty() {
-            return $.trim(chatEntry.val()).length === 0;
-        }
-
-        function sendCurrentMessage() {
-            var message = chatEntry.val();
-            if (!$.trim(message))
-                return false;
-            chatEntry.prop('disabled', true);
-            sendMessage(room, username, message)
-            .then(function() {
-                // Clear the field
-                chatEntry.val('');
-                chatEntry.prop('disabled', false).focus();
-            }, function(err) {
-                // Leave unsent value in the field
-                chatEntry.prop('disabled', false).focus();
-            });
-        }
-        
-        function chatEmojiClickHandler(event) {
-            var clicked = $(event.target).closest('.chat-emoji'),
-                sel = window.getSelection && window.getSelection(),
-                range = sel.rangeCount && sel.getRangeAt(0),
-                ins,
-                str;
-            if (!clicked.length)
-                return;
-
-            if (range && chatEntry.is(range.startContainer) && 
-                chatEntry.is(range.endContainer)) {
-                str = chatEntry.val();
-                str = str.substr(0, range.startOffset) +
-                    ins +
-                    str.substr(range.endOffset);
-                chatEntry.val(str);
-                range.collapse();
-            }
-        }
-        
-        function setUsername(name) {
-            if (name)
-                chatUsername.val(name).trigger('change');
-            return name;
-        }
-        
-        function usernameChangeHandler(event) {
-            username = chatUsername.val();
-            chatText.prop('disabled', 
-                !username || !username.length);
-
-            localStorage.username = username;
-        }
-
-        function pickEmojiHandler(event) {
-            var target = $(event.target),
-                emoji = target.closest('.chat-emoji'),
-                button = target.closest(chatPickEmoji),
-                input = chatEntry.get(0),
-                code = emoji.attr('data-chat-emoji-code');
-
-            if (emoji.length) {
-                replaceInputSelectedText(input, code, function() {
-                    if (!event.ctrlKey)
-                        emojiUI.hide();
-                });
-                return;
-            } else if (!button.length) {
-                return;
-            }
-
-            if (emojiUI) {
-                emojiUI.toggle();
-                return;
-            }
-
-            emojiRequest.then(function(emojies) {
-                var categoryList,
-                    byCategory,
-                    catList;
-
-                $(document).on('focusin click', function(event) {
-                    var target = $(event.target);
-                    if (emojiUI && (
-                        !target.closest(chatPickEmoji).length &&
-                        !target.closest(emojiUI).length
-                        ))
-                        emojiUI.hide();
-                });
-
-                byCategory = emojies.list.reduce(function(categories, emoji) {
-                    return upsertItem(categories, emoji.category, emoji);
-                }, {});
-
-                // Top level text menu
-                categoryList = $('<ul/>', {
-                    'class': 'chat-popup chat-dynamic-menuheight'
-                });
-
-                // Make an item for each category
-                Object.keys(byCategory).sort().forEach(function(key) {
-                    var list = this[key],
-                        title,
-                        catListItem,
-                        submenu;
-
-                    catListItem = $('<li/>', {
-                        'class': 'chat-popup-menuitem',
-                        appendTo: categoryList
-                    });
-
-                    title = $('<span/>', {
-                        'class': 'chat-popup-text',
-                        appendTo: catListItem,
-                        text: key
-                    });
-
-                    catListItem.hover(function(event) {
-                        updateMenuLimits(event, catListItem);
-
-                        if (!submenu)
-                            buildMenu();
-                        else
-                            submenu.removeClass('chat-pending-remove');
-
-                        submenu.insertAfter(title);
-                    }, function(event) {
-                        if (submenu.hasClass('chat-pending')) {
-                            submenu.addClass('chat-pending-remove');
-                        } else {
-                            submenu.detach();
-                        }
-                    });
-
-                    function buildMenu() {
-                        var overlay,
-                            expectedImages = [],
-                            timeout,
-                            progressTimeout,
-                            frac = 0,
-                            lastCompletion = 0;
-
-                        submenu = $('<div/>', {
-                            'class': [
-                                'chat-popup-menu',
-                                'chat-popup-loading',
-                                'chat-pending',
-                                'chat-dynamic-popup'
-                            ].join(' ')
-                        });
-
-                        list.forEach(function(emoji) {
-                            var li,
-                                img,
-                                code;
-
-                            code = emoji.aliases_ascii &&
-                                emoji.aliases_ascii.length &&
-                                emoji.aliases_ascii[0] ||
-                                emoji.shortname;
-
-                            img = $('<img/>', {
-                                'class': 'chat-emoji',
-                                title: emoji.shortname,
-                                src: emojies.files.dir + emoji.unicode + '.svg',
-                                'data-chat-emoji-code': code
-                            });
-
-                            expectedImages.push(img.get(0));
-
-                            img.on('load error', loadHandler);
-
-                            img.appendTo(submenu);
-                        });
-
-                        // Last so it is on top of everything
-                        overlay = $('<div/>', {
-                            'class': 'chat-fill chat-overlay',
-                            appendTo: submenu,
-                            text: 'Loading...'
-                        });
-
-                        timeout = setTimeout(function timeoutAgain() {
-                            // If an image finished within 10 seconds of now,
-                            if (Date.now() - lastCompletion < 10000) {
-                                // Extend the timeout
-                                timeout = setTimeout(timeoutAgain, 10000);
-                                console.log('emoji load grace period');
-                                return;
-                            }
-
-                            timeout = undefined;
-
-                            expectedImages.forEach(function(img) {
-                                console.error('timed out failed: ' + img.src);
-                            });
-
-                            $(expectedImages).off('load error', loadHandler);
-
-                            doneHandler();
-                        }, 10000);
-
-                        progressTimeout = setTimeout(function emojiProgressAgain() {
-                            overlay.text('Loading...' + frac + '%');
-
-                            progressTimeout = setTimeout(emojiProgressAgain, 1000);
-                        }, 1000);
-
-                        function loadHandler(event) {
-                            var index = expectedImages.indexOf(this),
-                                done;
-
-                            lastCompletion = Date.now();
-
-                            if (index >= 0)
-                                expectedImages.splice(index, 1);
-                            else
-                                console.log('weird unexpected load event');
-
-                            done = list.length - expectedImages.length;
-                            frac = (list.length && 
-                                (100 * done / list.length) || 0).toFixed(0);
-
-                            if (expectedImages.length === 0)
-                                doneHandler();
-                        }
-
-                        function doneHandler() {
-                            if (timeout) {
-                                clearTimeout(timeout);
-                                timeout = undefined;
-                            }
-                            if (progressTimeout) {
-                                clearTimeout(progressTimeout);
-                                progressTimeout = undefined;
-                            }
-                            submenu.addClass('chat-load-finished');
-                            overlay.text('Loading...100%').fadeOut().queue(function() {
-                                overlay.remove();
-                                overlay = undefined;
-                            });
-
-                            if (submenu.hasClass('chat-pending-remove')) {
-                                submenu.removeClass('chat-pending-remove');
-                                submenu.detach();
-                            }
-                        }
-                    }
-                }, byCategory);
-
-                emojiUI = categoryList;
-                categoryList.insertBefore(chatPickEmoji);
-            });
-        }
-    
-        function updateMenuLimits(event, catListItem) {
-            var ofsItem = catListItem.offset(),
-                ofsMessages = chatMessages.offset(),
-                width = (ofsItem.left - ofsMessages.left - 8),
-                height = ofsItem.top - ofsMessages.top - 8,
-                ofsButton = chatPickEmoji.offset(),
-                menuHeight = ofsButton.top - ofsMessages.top - 8,
-                source;
-
-            source = '.chat-dynamic-popup {' +
-                'width: ' + width + 'px; ' +
-                'max-height: ' + height + 'px; }\n' +
-                '.chat-dynamic-menuheight {' +
-                'max-height: ' + menuHeight + 'px;' +
-                '}';
-
-            chatDynamicStyle.text(source);
-        }
-        
-    }// end roomInstance()
+    }
     
     addEventForwarder('click', '.chat-footer', 'pickEmojiHandler');
     
@@ -752,6 +109,58 @@
         chatContainer.toggleClass('chat-hide-timestamp', !value);
     }, chatShowTimestamp, 'chatShowTimestamp');
     
+    chatContainer.on('click', '.chat-join-room-button', function(event) {
+        var target = $(event.target).closest('.chat-join-room-button'),
+            id = +target.attr('data-chat-room'),
+            name = target.attr('data-chat-room-name');
+        if (id === id)
+            toggleRoom(id, name);
+    });
+    
+    chatContainer.on('click', '.chat-popout-button', function(event) {
+        var button = $(event.target).closest('.chat-popout-button'),
+            popout = button.next('.chat-popout-container'),
+            ofs = button.offset(),
+            buttonHeight = button.outerHeight(),
+            doc = $(document);
+        
+        if (!popout.length)
+            return;
+        
+        ofs.top += buttonHeight;
+        console.log(ofs);
+        popout.appendTo(chatContainer);
+        popout.css({
+            left: 0,
+            top: 0
+        });
+        popout.offset(ofs);
+        popout.removeClass('chat-hidden');
+        popout.find('input').first().focus();
+        
+        doc.on('focusin click', function itself(event) {
+            var target = $(event.target),
+                inPopout;
+            
+            inPopout = (target.closest(popout).length > 0);
+            
+            if (!inPopout && !button.is(target)) {
+                doc.off('focusin click', itself);
+                popout.insertAfter(button);
+                popout.addClass('chat-hidden');
+            }
+        });
+    });
+    
+    chatContainer.on('click', '.chat-create-room', function(event) {
+        var target = $(event.target),
+            container = target.closest('.chat-popout-container'),
+            input = container.find('input'),
+            name = $.trim(input.val());
+        if (name)
+            createRoom(name);
+    });
+    
     chatContainer.on('change input', '.chat-font', 
     function(event) {
         var value = chatFont.val();
@@ -782,11 +191,375 @@
     
     allowSoundLater();
     
-    joinRoom(1, 'Default');
-    joinRoom(2, 'Other');
+    updateRoomList();
     
-    function joinRoom(room, name) {
-        roomInstance(chatRoom.clone(), room, name);
+    emojiDefer.resolve(getEmojiData());
+    
+    emojiPromise.then(function() {
+        if (localStorage.joinedRooms) {
+            localStorage.joinedRooms.split(/,/).forEach(function(roomId) {
+                joinRoom(1);
+            })
+        } else {
+            joinRoom(1);
+        }
+    });
+    
+    updateStarted = true;
+    update();
+    
+    function makeRoomControls(roomId) {
+        var room = chatRoom.clone(),
+            footer = $('.chat-footer', room);
+        return {
+            room: room,
+            title: $('.chat-room-title', room),
+
+            messages: $('.chat-messages', room),
+
+            footer: footer,
+            entry: $('.chat-entry', footer),
+            username: $('.chat-username', footer),
+            send: $('.chat-send', footer),
+            pickEmoji: $('.chat-pick-emoji', footer)
+        };
+    }
+    
+    function roomInstance(room) {
+        var api,
+            
+            roomRequest,
+            
+            currentMessage = -1,
+            preservedMessage;
+
+        api = {
+            lastKnownMessage: -1,
+            
+            controls: makeRoomControls(room),
+            
+            chatKeypressHandler: chatKeypressHandler,
+            chatKeydownHandler: chatKeydownHandler,
+            chatEmojiClickHandler: chatEmojiClickHandler,
+            chatWheelHandler: chatWheelHandler,
+            destroy: destroy,
+            pickEmojiHandler: pickEmojiHandler,
+            sendCurrentMessage: sendCurrentMessage,
+            usernameChangeHandler: usernameChangeHandler,
+            appendMessageFragment: appendMessageFragment
+        };
+        
+        rooms[room] = {
+            api: api
+        };
+        
+        roomRequest = getRoomInfo(room);
+
+        roomRequest.then(function(roomInfo) {
+            var name = roomInfo.name;
+            api.controls.title.text('Chat: ' + name);
+
+            api.controls.room.attr({
+                'data-chat-room-name': name
+            });
+        });
+
+        api.controls.room.attr({
+            'data-chat-room': room
+        });
+        chatRooms.append(api.controls.room);
+
+        username = localStorage.username;
+
+        if (!username) {
+            assignUsername()
+            .then(function uniqueUsernameResponseHandler(response) {
+                if (response.username)
+                    return setUsername(response.username);
+            });
+        } else {
+            setUsername(username);
+        }
+
+        api.controls.entry.focus();
+        
+        return api;
+        
+        function destroy() {
+            setJoinedIndication(room, false);
+            api.controls.room.remove();
+            if (abortUpdate)
+                abortUpdate();
+            delete rooms[room];
+        }
+        
+        function usernameChangeHandler(event) {
+           username = api.controls.username.val();
+            chatText.prop('disabled', 
+                !username || !username.length);
+        
+            localStorage.username = username;
+        }
+        
+        function chatKeypressHandler(event) {
+            var dir;
+
+            if (event.type === 'input') {
+                api.controls.send.prop('disabled', isCurrentMessageEmpty());
+                return;
+            }
+
+            switch (event.which) {
+            case 13:
+                sendCurrentMessage();
+                event.preventDefault();
+                break;
+            }
+        }
+        
+        function chatKeydownHandler(event) {
+            var messages,
+                message,
+                dir,
+                id,
+                text;
+
+            switch (event.which) {
+            case 38:    // up
+            case 40:    // down
+            case 27:    // esc
+                // Direction of message index change
+                dir = event.which === 38 ? 1 : 
+                    event.which === 40 ? -1 : 0;
+
+                event.preventDefault();
+
+                if (dir === 0) {
+                    // escape
+                    if (currentMessage !== -1) {
+                        api.controls.entry
+                            .val(preservedMessage)
+                            .removeClass('chat-editing');
+                        preservedMessage = '';
+                        currentMessage = -1;
+                    }
+                    return;
+                }
+
+                messages = ownMessages();
+
+                if (dir < 0 && currentMessage < 0)
+                    return;
+
+                // If pressing up from new chat message, save it
+                if (dir > 0 && currentMessage < 0)
+                    preservedMessage = api.controls.entry.val();
+
+                if (currentMessage < 0) {
+                    message = messages.all.first();
+                } else if (messages.selectedIndex === 0 && dir < 0) {
+                    message = $();
+                } else if ((messages.selectedIndex === 
+                        messages.length - 1) && dir > 0) {
+                    message = $();
+                } else {
+                    message = messages.all.eq(messages.selectedIndex+dir);
+                }
+                if (message.length) {
+                    text = message.attr('data-message');
+                    id = +message.attr('data-messageid');
+                    currentMessage = id;
+                    api.controls.entry
+                        .val(text)
+                        .addClass('chat-editing');
+                } else if (dir < 0) {
+                    api.controls.entry
+                        .val(preservedMessage)
+                        .removeClass('chat-editing');
+                    currentMessage = -1;
+                    preservedMessage = '';
+                }
+                break;
+
+            case 33:
+            case 34:
+            case 35:
+            case 36:
+                dir = event.which === 33 ? 1 : 
+                    event.which === 34 ? -1 :
+                    (event.ctrlKey && (event.which === 35)) ? -1000 :
+                    (event.ctrlKey && (event.which === 36)) ? 1000 :
+                    0;
+
+                api.controls.messages.scrollTop(chatMessages.scrollTop() +
+                    dir * api.controls.messages.innerHeight() * 0.95);
+
+                break;
+
+            }
+
+            function ownMessages() {
+                var messages,
+                    selectedIndex;
+
+                messages = api.controls.messages.children('.chat-message-own');
+                messages.each(function findCurrentMessage(i) {
+                    var id = +$(this).attr('data-messageid');
+                    if (id === currentMessage)
+                        selectedIndex = i;
+                });
+
+                return {
+                    all: messages,
+                    selectedIndex: selectedIndex
+                };
+            }
+        }
+        
+        function chatWheelHandler(event) {
+            event.preventDefault();
+
+            var oe = event.originalEvent,
+                delta = oe.deltaY,
+                scroll = api.controls.messages.scrollTop(),
+                dist = 75;
+
+            api.controls.messages.scrollTop(scroll -
+                Math.sign(delta) * dist);
+        }
+
+        function isCurrentMessageEmpty() {
+            return $.trim(api.controls.entry.val()).length === 0;
+        }
+    
+        function appendMessageFragment(frag) {
+            api.controls.messages.prepend(frag);
+            api.controls.messages.children().slice(messageLimit).remove();
+        }
+
+        function sendCurrentMessage() {
+            var message = api.controls.entry.val();
+            if (!$.trim(message))
+                return false;
+            api.controls.entry.prop('disabled', true);
+            sendMessage(room, username, message)
+            .then(function() {
+                // Clear the field
+                api.controls.entry.val('');
+                api.controls.entry.prop('disabled', false).focus();
+            }, function(err) {
+                // Leave unsent value in the field
+                api.controls.entry.prop('disabled', false).focus();
+            });
+        }
+        
+        function chatEmojiClickHandler(event) {
+            var clicked = $(event.target).closest('.chat-emoji'),
+                sel = window.getSelection && window.getSelection(),
+                range = sel.rangeCount && sel.getRangeAt(0),
+                ins,
+                str;
+            if (!clicked.length)
+                return;
+
+            if (range && api.controls.entry.is(range.startContainer) && 
+                api.controls.entry.is(range.endContainer)) {
+                str = api.controls.entry.val();
+                str = str.substr(0, range.startOffset) +
+                    ins +
+                    str.substr(range.endOffset);
+                api.controls.entry.val(str);
+                range.collapse();
+            }
+        }
+        
+        function setUsername(name) {
+            if (name)
+                api.controls.username.val(name).trigger('change');
+            return name;
+        }
+        
+        function usernameChangeHandler(event) {
+            username = api.controls.username.val();
+            chatText.prop('disabled', 
+                !username || !username.length);
+
+            localStorage.username = username;
+        }
+
+        function pickEmojiHandler(event) {
+            var target = $(event.target),
+                emoji = target.closest('.chat-emoji'),
+                button = target.closest(api.controls.pickEmoji),
+                input = api.controls.entry.get(0),
+                code = emoji.attr('data-chat-emoji-code');
+
+            if (emoji.length) {
+                replaceInputSelectedText(input, code, function() {
+                    if (!event.ctrlKey)
+                        emojiUI.hide();
+                });
+                return;
+            } else if (!button.length) {
+                return;
+            }
+
+            if (emojiUI) {
+                emojiUI.toggle();
+                return;
+            }
+
+            handleEmojiRequest(emojiPromise, 
+                api.controls.messages, 
+                api.controls.pickEmoji);
+        }        
+    }// end roomInstance()
+        
+    function toggleRoom(room) {
+        var roomInfo = rooms[room];
+        if (roomInfo)
+            roomInfo.api.destroy();
+        else
+            joinRoom(room);
+    }
+    
+    function joinRoom(room) {
+        if (rooms[room])
+            return false;
+        
+        roomInstance(room);
+
+        if (abortUpdate)
+            abortUpdate();
+        else if (updateStarted)
+            update();
+        
+        setJoinedIndication(room, true);
+    }
+    
+    function setJoinedIndication(room, joined) {
+        chatJoinRoomList.find('[data-chat-room="' + (+room) + '"]')
+            .toggleClass('chat-room-joined', !!joined);
+    }
+
+    function createRoom(name) {
+        return d2p($.post({
+            url: '/api/wschat/rooms',
+            contentType: 'application/json',
+            dataType: 'application/json',
+            data: JSON.stringify({
+                name: name
+            })
+        })).then(function(roomInfo) {
+            joinRoom(+roomInfo.id, roomInfo.name);
+            
+            return roomInfo;
+        }).then(function(roomInfo) {
+            updateRoomList();
+            return roomInfo;
+        }).catch(function(err) {
+            alert(err);
+        });
     }
     
     function addEventForwarder(eventNames, selector, name) {
@@ -796,8 +569,266 @@
             var target = $(event.target),
                 chatRoom = target.closest('.chat-room'),
                 roomId = chatRoom.attr('data-chat-room'),
-                roomApi = rooms[roomId];
-            return roomApi[name](event);
+                roomInfo = rooms[roomId];
+            return roomInfo.api[name](event);
+        }
+    }
+
+    function createMessageIndirect(data) {
+        var message,
+            id,
+            part,
+            timestamp = +Date.parse(data.updatedAt),
+            message = renderMessage(data.message);
+
+        id = 'chat-' + data.id;
+
+        chatMessage.attr({
+            'data-messageid': data.id,
+            'data-sender': data.sender,
+            'data-timestamp': timestamp,
+            'data-message': data.message,
+            'id': id
+        });
+        chatMessage.toggleClass('chat-message-own', data.sender === username);
+        chatMessage.toggleClass('chat-message-not-own', data.sender !== username);
+
+        chatTime.empty().append(renderTimestamp(id, timestamp));
+
+        chatSender.text(data.sender);
+
+        chatText.empty().append(message);
+
+        return chatMessage.clone();
+    }
+
+    function renderTimestamp(id, ts) {
+        var date = new Date(ts),
+            datetime,
+            text,
+            textnode,
+            span;
+
+        datetime = [
+            date.getFullYear(),
+            date.getMonth() + 1,
+            date.getDate(),
+            date.getHours(),
+            date.getMinutes(),
+            date.getSeconds(),
+            date.getMilliseconds(),
+            0,
+            0
+        ];
+
+        datetime[7] = datetime[3] % 12;
+        datetime[7] = datetime[7] || 12;
+        datetime[8] = datetime[3] >= 12 ? 'pm' : 'am';
+
+        text = [
+            //'[', 
+            (' ' + datetime[7]).substr(-2), 
+            ':', 
+            ('0' + datetime[4]).substr(-2), 
+            datetime[8], 
+            //']'
+        ].join('');
+
+        return $('<a/>', {
+            href: '#' + id,
+            'title': String(new Date(ts)),
+            text: text,
+            target: '_blank'
+        });
+    }
+
+    // Returns an array of elements
+    function renderMessage(input) {
+        var //matches = reverseMatches(/(`+)(.*?)\1/g, input),
+            result = [input],
+            didany;
+
+        // Keep applying the first rule until no more rules ran
+        // while loop empty body just repeats its condition
+        while (result.some(function renderProcessFragment(item, index, result) {
+            if (typeof item !== 'string')
+                return;
+
+            return markupRenderTable.some(function renderApplyRule(entry) {
+                var match = item.match(entry.re),
+                    before,
+                    replacement,
+                    after;
+                if (!match)
+                    return;
+
+                before = item.substr(0, match.index);
+                after = item.substr(match.index + match[0].length);
+                replacement = entry.handler(match);
+
+                // Remove the modified node
+                result.splice(index, 1);
+
+                // If there was text before
+                if (after)
+                    result.splice(index, 0, after);
+
+                if (replacement)
+                    result.splice(index, 0, replacement);
+
+                // If there was text after
+                if (before)
+                    result.splice(index, 0, before);
+
+                return true;
+            });
+        }));
+
+        return result.filter(function renderFilterEmptyString(node) {
+            // Get rid of empty string fragments
+            return node !== '';
+        }).map(function renderWrapStringsInSpans(node) {
+            // Wrap strings in spans
+            var span;
+            if (typeof node === 'string') {
+                return $('<span/>', {
+                    'class': 'chat-text-span',
+                    text: node
+                });
+            }
+            return node;
+        }).reduce(function renderAppendToParagraph(parent, node) {
+            // Append everything to a paragraph
+            parent.append(node);
+            return parent;
+        }, $('<p/>'));
+    }
+
+    // Infinite get request, never resolves,
+    // endlessly gets more messages
+    // but might reject
+    function update(backoff) {
+        var sinceItems,
+            defer;
+        
+        sinceItems = Object.keys(rooms).map(function(roomId) {
+            var roomApi = rooms[roomId].api,
+                lastKnownMessage = roomApi.lastKnownMessage;
+            return [roomId, lastKnownMessage].join('!');
+        }).join(' ');
+        
+        // If nothing to wait for, return defer that gets resolved
+        // with whatever next update resolves
+        if (sinceItems.length === 0) {
+            // abort returns a deferred resolved with the update
+            defer = $.Deferred();
+            abortUpdate = function() {
+                defer.resolve(update());
+            };
+            return defer.promise();
+        }
+        
+        abortUpdate = $.noop;
+        
+        return $.getJSON({
+            url: '/api/wschat/rooms/message/stream',
+            data: {
+                since: sinceItems,
+                nowait: netProblem ? 1 : 0
+            },
+            beforeSend: function updateBeforeSendHandler(xhr) {
+                xhr.setRequestHeader('X-Auth-Token', '42');
+
+                abortUpdate = function() {
+                    xhr.abort();
+                };
+            },
+            timeout: 36 * 6 * 1000
+        }).then(function updateResponseHandler(response) {
+            var items,
+                animClassName,
+                frag,
+                mentionRegex,
+                roomData = response.rooms;
+            
+            abortUpdate = null;
+            
+            netHavingProblem(false);
+
+            if (roomData) {
+                frag = $(window.document.createDocumentFragment());
+                mentionRegex = matchWholeWordRegex('@' + username);
+                
+                Object.keys(roomData).forEach(function(roomId) {
+                    var messages = roomData[roomId],
+                        roomApi = rooms[roomId].api;
+                
+                    animClassName = messages.length > 8 ? 
+                        'chat-load' : 'chat-reveal';
+                    
+                    items = messages.map(function updateMapMessage(message) {
+                        var item;
+
+                        roomApi.lastKnownMessage = Math.max(
+                            roomApi.lastKnownMessage,
+                            message.id);
+                        item = createMessageIndirect(message);
+                        item.addClass(animClassName);
+                        frag.prepend(item);
+
+                        if (mentionRegex.test(message.message))
+                            notifyMention(message);
+
+                        return item.get(0);
+                    });
+                    roomApi.appendMessageFragment(frag);
+                });
+            }
+            return update();
+        }, function updateErrorHandler(err) {
+            abortUpdate = null;
+
+            netHavingProblem(true);
+
+            // Exponential backoff from 200ms up to 10s per retry
+            if (!backoff)
+                netHavingProblem(true);
+            
+            //
+            // Wait some time then try again
+            
+            var defer = $.Deferred();
+
+            console.log('error=', err, 'backoff=', backoff);
+            setTimeout(function updateBackoffHandler(backoff) {
+                defer.resolve(update(Math.min((backoff || 100) * 2, 10000)));
+            }, backoff || 0, backoff);
+            
+            return defer.promise();
+        }, function updateProgressHandler(progress) {
+            console.log('update progress', progress);
+        });
+    }
+    
+    function notifyMention(message) {
+        if (Notif && 
+            localStorage.chatNotification !== 'false') {
+            try {
+                new Notif('doug16k.com chat', {
+                    icon: 'vendor/emojione.com/1f642.svg',
+                    body: message.sender + 
+                        ' mentioned you\n' + 
+                        message.message
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        try {
+            playSound(notificationSoundUrl);
+        } catch (err) {
+            console.error(err);
         }
     }
     
@@ -822,7 +853,12 @@
         
         newSizeStyle = $('<style/>', {
             appendTo: 'head',
-            text: '.chat-container, .chat-text { font-size: ' + 
+            text: '.chat-container, ' +
+                '.chat-container .chat-text, ' +
+                '.chat-container input,' +
+                '.chat-container select,' +
+                '.chat-container button {' +
+                ' font-size: ' + 
                 (((2 - size) * 15) + 'px') + '}'
         });
         
@@ -896,7 +932,7 @@
             handler: null
         };
         
-        emojiRequest.then(function(emojies) {
+        emojiPromise.then(function(emojies) {
             var emojiTable = emojies.index;
             obj.re = makeEmojiRegexp(emojies);
             obj.handler = function replaceEmoji(match) {
@@ -951,6 +987,10 @@
     function matchWholeWordRegex(needle) {
         return new RegExp(regexEscape(needle) + '(?![a-zA-Z0-9,.-])', 'i');
     }
+    
+    function getRoomInfo(room) {
+        return d2p($.getJSON('/api/wschat/rooms/' + +room));
+    }
  
     function getEmojiIndex() {
         return $.getJSON({
@@ -958,8 +998,208 @@
         });
     }
     
+    function handleEmojiRequest(emojiRequest, chatMessages, chatPickEmoji) {
+        emojiRequest.then(function(emojies) {
+            var categoryList,
+                byCategory,
+                catList;
+
+            $(document).on('focusin click', function(event) {
+                var target = $(event.target);
+                if (emojiUI && (
+                    !target.closest(chatPickEmoji).length &&
+                    !target.closest(emojiUI).length
+                    ))
+                    emojiUI.hide();
+            });
+
+            byCategory = emojies.list.reduce(function(categories, emoji) {
+                return upsertItem(categories, emoji.category, emoji);
+            }, {});
+
+            // Top level text menu
+            categoryList = $('<ul/>', {
+                'class': 'chat-popup chat-dynamic-menuheight'
+            });
+
+            // Make an item for each category
+            Object.keys(byCategory).sort().forEach(function(key) {
+                var list = this[key],
+                    title,
+                    catListItem,
+                    submenu;
+
+                catListItem = $('<li/>', {
+                    'class': 'chat-popup-menuitem',
+                    appendTo: categoryList
+                });
+
+                title = $('<span/>', {
+                    'class': 'chat-popup-text',
+                    appendTo: catListItem,
+                    text: key
+                });
+
+                catListItem.hover(function(event) {
+                    updateMenuLimits(event, chatMessages, 
+                        catListItem, chatPickEmoji);
+
+                    if (!submenu)
+                        buildMenu();
+                    else
+                        submenu.removeClass('chat-pending-remove');
+
+                    submenu.insertAfter(title);
+                }, function(event) {
+                    if (submenu.hasClass('chat-pending')) {
+                        submenu.addClass('chat-pending-remove');
+                    } else {
+                        submenu.detach();
+                    }
+                });
+
+                function buildMenu() {
+                    var overlay,
+                        expectedImages = [],
+                        timeout,
+                        progressTimeout,
+                        frac = 0,
+                        lastCompletion = 0;
+
+                    submenu = $('<div/>', {
+                        'class': [
+                            'chat-popup-menu',
+                            'chat-popup-loading',
+                            'chat-pending',
+                            'chat-dynamic-popup'
+                        ].join(' ')
+                    });
+
+                    list.forEach(function(emoji) {
+                        var li,
+                            img,
+                            code;
+
+                        code = emoji.aliases_ascii &&
+                            emoji.aliases_ascii.length &&
+                            emoji.aliases_ascii[0] ||
+                            emoji.shortname;
+
+                        img = $('<img/>', {
+                            'class': 'chat-emoji',
+                            title: emoji.shortname,
+                            src: emojies.files.dir + emoji.unicode + '.svg',
+                            'data-chat-emoji-code': code
+                        });
+
+                        expectedImages.push(img.get(0));
+
+                        img.on('load error', loadHandler);
+
+                        img.appendTo(submenu);
+                    });
+
+                    // Last so it is on top of everything
+                    overlay = $('<div/>', {
+                        'class': 'chat-fill chat-overlay',
+                        appendTo: submenu,
+                        text: 'Loading...'
+                    });
+
+                    timeout = setTimeout(function timeoutAgain() {
+                        // If an image finished within 10 seconds of now,
+                        if (Date.now() - lastCompletion < 10000) {
+                            // Extend the timeout
+                            timeout = setTimeout(timeoutAgain, 10000);
+                            console.log('emoji load grace period');
+                            return;
+                        }
+
+                        timeout = undefined;
+
+                        expectedImages.forEach(function(img) {
+                            console.error('timed out failed: ' + img.src);
+                        });
+
+                        $(expectedImages).off('load error', loadHandler);
+
+                        doneHandler();
+                    }, 10000);
+
+                    progressTimeout = setTimeout(function emojiProgressAgain() {
+                        overlay.text('Loading...' + frac + '%');
+
+                        progressTimeout = setTimeout(emojiProgressAgain, 1000);
+                    }, 1000);
+
+                    function loadHandler(event) {
+                        var index = expectedImages.indexOf(this),
+                            done;
+
+                        lastCompletion = Date.now();
+
+                        if (index >= 0)
+                            expectedImages.splice(index, 1);
+                        else
+                            console.log('weird unexpected load event');
+
+                        done = list.length - expectedImages.length;
+                        frac = (list.length && 
+                            (100 * done / list.length) || 0).toFixed(0);
+
+                        if (expectedImages.length === 0)
+                            doneHandler();
+                    }
+
+                    function doneHandler() {
+                        if (timeout) {
+                            clearTimeout(timeout);
+                            timeout = undefined;
+                        }
+                        if (progressTimeout) {
+                            clearTimeout(progressTimeout);
+                            progressTimeout = undefined;
+                        }
+                        submenu.addClass('chat-load-finished');
+                        overlay.text('Loading...100%').fadeOut().queue(function() {
+                            overlay.remove();
+                            overlay = undefined;
+                        });
+
+                        if (submenu.hasClass('chat-pending-remove')) {
+                            submenu.removeClass('chat-pending-remove');
+                            submenu.detach();
+                        }
+                    }
+                }
+            }, byCategory);
+
+            emojiUI = categoryList;
+            categoryList.insertBefore(chatPickEmoji);
+        });
+    }    
+
+    function updateMenuLimits(event, chatMessages, catListItem, button) {
+        var ofsItem = catListItem.offset(),
+            ofsMessages = chatMessages.offset(),
+            width = (ofsItem.left - ofsMessages.left - 8),
+            height = ofsItem.top - ofsMessages.top - 8,
+            ofsButton = button.offset(),
+            menuHeight = ofsButton.top - ofsMessages.top - 8,
+            source;
+
+        source = '.chat-dynamic-popup {' +
+            'width: ' + width + 'px; ' +
+            'max-height: ' + height + 'px; }\n' +
+            '.chat-dynamic-menuheight {' +
+            'max-height: ' + menuHeight + 'px;' +
+            '}';
+
+        chatDynamicStyle.text(source);
+    }
+    
     function getEmojiData() {
-        return $.getJSON('vendor/emojione-data.json').then(function(data) {
+        return d2p($.getJSON('vendor/emojione-data.json').then(function(data) {
             var emojies = {
                 list: null,
                 index: null,
@@ -973,7 +1213,7 @@
             }, data).sort(sortByProps('category', 'name'));
             
             return emojies;
-        }).then(function(emojies) {
+        })).then(function(emojies) {
             emojies.index = emojies.list.reduce(function(result, emoji) {
                 var unicode = emoji.unicode.split(/-/).map(function(f) {
                     return parseInt(f, 16);
@@ -991,14 +1231,12 @@
             
             return emojies;
         }).then(function(emojies) {
-            var deferred = $.Deferred();
-            
-            getEmojiIndex().then(function(files) {
-                emojies.files = files;
-                deferred.resolve(emojies);
-            });
-            
-            return deferred.promise();
+            return new Promise(function(resolve, reject) {
+                getEmojiIndex().then(function(files) {
+                    emojies.files = files;
+                    resolve(emojies);
+                }, reject);
+            });          
         });
     }
     
@@ -1036,12 +1274,14 @@
                 input.selectionStart = start;
                 input.selectionEnd = start;
             }
+            $(input).trigger('input').focus();
             next();
         } else if (document.selection && document.selection.createRange) {
             // IE
             $(input).one('focus', function(event) {
                 range = document.selection.createRange();
                 range.text = code;
+                $(this).focus();
                 next();
             });
         }
@@ -1053,6 +1293,9 @@
     
     function sendMessage(room, sender, message, backoff) {
         var later;
+        
+        if (!rooms[room])
+            return $.Deferred().reject(new Error('Cancelled'));
         
         if (!backoff)
             return attempt();
@@ -1125,7 +1368,27 @@
     }
     
     function netHavingProblem(problem) {
-        problemIndicator.toggleClass('hidden', !problem);
+        if (netProblem !== problem) {
+            netProblem = problem;
+            problemIndicator.toggleClass('hidden', !problem);
+        }
+    }
+    
+    function updateRoomList() {
+        return $.getJSON('/api/wschat/rooms').then(function(roomList) {
+            var items = roomList.map(function(roomInfo) {
+                var item = chatJoinRoomEntry.clone();
+                $('.chat-join-room-button', item)
+                    .text(roomInfo.name)
+                    .attr({
+                        'data-chat-room': roomInfo.id,
+                        'data-chat-room-name': roomInfo.name
+                    })
+                    .toggleClass('chat-room-joined', !!rooms[roomInfo.id]);
+                return item;
+            });
+            chatJoinRoomList.empty().append(items);
+        });
     }
     
     function initFontLookup(select) {
@@ -1134,7 +1397,9 @@
             fontLookup;
         
         fonts = [
+            '',
             'Open Sans',
+            'Open Sans Condensed:300,300italic,700',
             'Josefin Slab', 
             'Arvo', 
             'Lato', 
@@ -1146,7 +1411,8 @@
             'Old Standard TT', 
             'Droid Sans',
             'Amiri',
-            'Arimo'
+            'Arimo',
+            'Raleway'
         ];
         
         url = 'https://fonts.googleapis.com/css?family=';
@@ -1154,27 +1420,35 @@
         select.empty();
         
         fontLookup = fonts.reduce(function(fontLookup, name) {
-            var css;
+            var css,
+                separatorIndex = name.indexOf(':'),
+                baseName = separatorIndex < 0 ? name
+                    : name.substr(0, separatorIndex);
             
-            css = [
-                '@import url(' + url + 
-                    encodeURIComponent(name) + ');',
-                '.chat-container,',
-                '.chat-container a,',
-                '.chat-container input,',
-                '.chat-container select,',
-                '.chat-container button {',
-                'font-family: \'' + name + '\';',
-                '}'
-            ].join('\n');
+            if (name) {
+                css = [
+                    '@import url(' + url + 
+                        encodeURIComponent(name) + ');',
+                    '.chat-container,',
+                    '.chat-container a,',
+                    '.chat-container input,',
+                    '.chat-container select,',
+                    '.chat-container button {',
+                    'font-family: \'' + baseName + '\';',
+                    '}'
+                ].join('\n');
+            } else {
+                css = '';
+            }
             
-            fontLookup[name] = $('<style/>', {
+            fontLookup[baseName] = $('<style/>', {
                 text: css
             });
             
             $('<option/>', {
-                value: name,
-                text: name,
+                'data-chat-font-name': name,
+                value: baseName,
+                text: baseName || 'None',
                 appendTo: select
             });
             
@@ -1270,6 +1544,16 @@
                     0;
             };
         }
+    }
+    
+    function toPromise(jqXHR) {
+        var defer = $.Deferred();
+        jqXHR.then(function( data, textStatus, jqXHR ) {
+            defer.resolve(data);
+        }, function( jqXHR, textStatus, errorThrown ) {
+            defer.reject(errorThrown);
+        });
+        return defer;
     }
 }(this, jQuery, [
     // http://data.iana.org/TLD/tlds-alpha-by-domain.txt

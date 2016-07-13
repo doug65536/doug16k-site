@@ -1,3 +1,4 @@
+/* global console */
 "use strict";
 
 var Promise = require('bluebird'),
@@ -31,10 +32,7 @@ function master() {
         userList = {};
     
     chatdb.sync(false)
-    .catch(util.makeErrorDumper('chat sync'))
-    //.then(function() {
-    //    chatdb.createDefaultRoom();
-    //});
+    .catch(util.makeErrorDumper('chat sync'));
 
     //console.log('starting master message receiver');
 
@@ -56,7 +54,7 @@ function master() {
     });
     
     //console.log('master listening for messages');
-};
+}
 
 function worker(cluster, app, jsonParser) {
     //console.log(cluster.worker.id, 'starting chat server worker');
@@ -83,7 +81,7 @@ function worker(cluster, app, jsonParser) {
         //console.log('worker received message', msg);
         serviceWaitQueue(msg.roomActivity);
     });
-
+    
     // Create a room
     app.post('/api/wschat/rooms', jsonParser, function(req, res) {
         //console.log('posting', req.body);
@@ -128,6 +126,124 @@ function worker(cluster, app, jsonParser) {
     app.get('/api/wschat/message/ping', function(req, res) {
         res.send();
     });
+    
+    // use single request to get messages from multiple rooms
+    // ?since=12:34,56:789
+    // to wait for messages in room 12 since 34,
+    // and wait for messages in room 56 
+    app.get('/api/wschat/rooms/message/stream', function(req, res) {
+        var since = req.query.since,
+            noWait = +req.query.nowait !== 0,
+            allWait,
+            roomItems,
+            roomPairs,
+            valid;
+        
+        roomPairs = since && since.length > 0 &&
+            since.split(/ /);
+        
+        roomItems = roomPairs && roomPairs.map(function(item) {
+            var itemPair = item.split(/!/),
+                roomId = +itemPair[0],
+                messageId = +itemPair[1];
+            return roomId === roomId && 
+                messageId === messageId &&
+                roomId > 0 &&
+                messageId >= -1 && {
+                room: roomId,
+                since: messageId,
+                wait: messageId === roomLatest[roomId]
+            };
+        });
+        
+        valid = roomItems && roomItems.every(function(item) {
+            return !!item;
+        });
+        
+        if (!valid) {
+            res.status(400).send('Bad request');
+            return;
+        }
+        
+        allWait = roomItems && roomItems.every(function(item) {
+            return item.wait;
+        });
+        
+        if (allWait && noWait) {
+            res.send({});
+        } else if (allWait) {
+            console.log('eager wait');
+            waitForRoomActivity(res, roomItems);
+        } else {
+            // Force it to do one query at a time,
+            // build up results
+            console.log(roomItems);
+            gatherResults(roomItems).then(function(results) {
+                var empty = (!results || Object.keys(results).length === 0);
+                
+                if (!empty || noWait) {
+                    res.send({
+                        rooms: results
+                    });
+                } else if (empty) {
+                    waitForRoomActivity(res, roomItems);
+                }
+            }, util.makeErrorDumper('multi room message stream'));
+        }
+        
+        function waitForRoomActivity(res, roomItems) {
+            var waitQueue,
+                waiter;
+            
+            waiter = {
+                res: res,
+                roomItems: roomItems,
+                timeout: 0
+            };
+
+            // Add entry to every room's queue
+            roomItems.forEach(function(roomItem) {
+                var room = roomItem.room;
+                
+                if (!waitQueues[room]) {
+                    console.log('creating queue for room', room);
+                }
+
+                // Get room queue or create new queue
+                waitQueue = waitQueues[room] ||
+                    (waitQueues[room] = []);
+
+                waitQueue.push(waiter);
+            });
+
+            res.setHeader('Connection', 'close');
+
+            // If connection closes abruptly, remove from queue
+            req.on('close', requestClosed);
+
+            req.setTimeout(5 * 60 * 1000);
+
+            // Timeout in 3.5 minutes
+            waiter.timeout = setTimeout(requestTimedOut, 210000, 
+                roomItems, waiter);
+
+            function requestClosed() {
+                if (waiter.timeout !== undefined) {
+                    clearTimeout(waiter.timeout);
+                    waiter.timeout = undefined;
+                }
+
+                removeFromQueues(roomItems, waiter);
+            }
+        }
+        
+        function requestTimedOut(roomItems, waiter) {
+            waiter.timeout = undefined;
+            
+            if (removeFromQueues(roomItems, waiter))
+                waiter.res.send({});
+        }
+    });
 
     app.get('/api/wschat/rooms/:room/message/stream', function(req, res) {
         var since = req.query.since && +req.query.since || 0,
@@ -162,7 +278,7 @@ function worker(cluster, app, jsonParser) {
             
             waiter = {
                 res: res,
-                since: since,
+                roomItems: since,
                 timeout: 0
             };
 
@@ -187,7 +303,7 @@ function worker(cluster, app, jsonParser) {
             req.setTimeout(5 * 60 * 1000);
 
             // Timeout in 3.5 minutes
-            waiter.timeout = setTimeout(requestTimedOut, 210000, 
+            waiter.timeout = setTimeout(requestTimedOut, 5000, //210000, 
                 waitQueue, waiter);
 
             function requestClosed() {
@@ -203,7 +319,7 @@ function worker(cluster, app, jsonParser) {
         function requestTimedOut(waitQueue, waiter) {
             waiter.timeout = undefined;
             
-            if (removeFromQueue(waitQueue, waiter, hint))
+            if (removeFromQueue(waitQueue, waiter))
                 waiter.res.send({});
         }
     });
@@ -287,6 +403,27 @@ function worker(cluster, app, jsonParser) {
         });
     });
     
+    function gatherResults(roomItems, i, results) {
+        i = i || 0;
+        var roomId = roomItems[i].room,
+            since = roomItems[i].since;
+        
+        return (chatdb.getSomeFromId(roomId, since || -1, defaultLimit)
+        .then(function(messages) {
+            if (messages && messages.length) {
+                if (!results)
+                    results = {};
+
+                results[roomId] = messages;
+            }
+
+            if (i + 1 < roomItems.length)
+                return gatherResults(roomItems, i + 1, results);
+
+            return results;
+        }));
+    }
+    
     function makeErrorSender(res) {
         return function(err) {
             console.error(err);
@@ -322,6 +459,12 @@ function worker(cluster, app, jsonParser) {
         });
     }
     
+    function removeFromQueues(roomItems, waiter) {
+        return roomItems.reduce(function(result, roomItem) {
+            return removeFromQueue(waitQueues[roomItem.room], waiter) || result;
+        }, false);
+    }
+    
     function removeFromQueue(waitQueue, waiter, hint) {
         if (hint === undefined || waitQueue[hint] !== waiter)
             hint = waitQueue.indexOf(waiter);
@@ -331,11 +474,14 @@ function worker(cluster, app, jsonParser) {
     
     function serviceWaitQueue(room) {
         console.assert(room);
+        
         var waitQueue = waitQueues[room];
+        
         if (!waitQueue)
             console.log('no queue for room', room);
         else
             console.log('servicing queue for room', room, waitQueue.length);
+        
         waitQueue && waitQueue.splice(0, waitQueue.length)
         .forEach(function(waiter) {
             if (waiter.timeout) {
@@ -343,41 +489,48 @@ function worker(cluster, app, jsonParser) {
                 waiter.timeout = undefined;
             }
             
+            // Remove it from the other queues
+            waiter.roomItems.forEach(function(roomItem) {
+                var otherQueue,
+                    index,
+                    removed;
+                if (roomItem.room === room)
+                    return;
+                otherQueue = waitQueues[roomItem.room];
+                index = otherQueue.indexOf(waiter);
+                removed = otherQueue.splice(index, 1);
+                console.assert(removed);
+                console.log('removed waiter from other room', roomItem.room)
+            });
+            
             sendMessagesSince(waiter.res, room,
-                waiter.since, defaultLimit);
+                waiter.roomItems, defaultLimit);
         });
     }
 
     function sendMessagesSince(res, room, since, limit) {
-        var messages;
+        var messages,
+            promises;
         
-        // Try to get client aligned on id that starts with
-        // a multiple of 32, for maximum cache hits
-        limit = since < 0 ? limit : (((since + defaultLimit) & -defaultLimit) - since);
-        
-        return chatdb.getSomeFromId(
-                room, since, limit).then(function(messages) {
-            var lastMessage,
-                roomLatestId;
+        gatherResults(since).then(function(results) {
+            // Update latest message ids
+            Object.keys(results).forEach(function(roomId) {
+                var roomMessages = this[roomId],
+                    lastMessage = roomMessages[roomMessages.length-1],
+                    lastId = lastMessage && lastMessage.id;
+                if (lastMessage && roomLatest[roomId] < lastMessage.id)
+                    roomLatest[roomId] = lastMessage.id
+            }, results);
             
-            if (messages) {
-                //console.log('sending some from id', messages);
-                res.send({
-                    messages: messages
-                });
-                
-                console.dir(roomLatest);
-                
-                // Update latest if new data has higher id for this room
-                lastMessage = messages[messages.length - 1];
-                roomLatestId = roomLatest[room];
-                if (!roomLatestId ||
-                    +lastMessage.id > roomLatestId) {
-                    roomLatest[room] = +lastMessage.id;
-                }
-            }
-            
-            return messages && messages.length && messages || null;
+            res.send({
+                rooms: results
+            });
         }, util.makeErrorDumper('sendMessagesSince'));
     }
-};
+}
+
+function spread(fn) {
+    return function(pack) {
+        return fn.apply(this, pack);
+    };
+}

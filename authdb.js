@@ -1,6 +1,5 @@
 "use strict";
 
-
 var Promise = require('bluebird'),
     crypto = require('crypto'),
     Sequelize = require('sequelize'),
@@ -88,7 +87,6 @@ module.exports = {
             return pbkdf2Async(password, saltData, 
                 pbkdfRounds, pbkdfLength, pbkdfDigest);
         }).then(function(hash) {
-            // If record was not found, introduce a delay            
             return record.password === hash;
         });
     },
