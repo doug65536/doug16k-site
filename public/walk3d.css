@@ -1,0 +1,105 @@
+#ptrlock {
+    display: none;
+}
+
+.view {
+    background: black;
+    cursor: pointer;
+    perspective: 911px;
+    position: relative;
+    width: 800px;
+    height: 600px;
+    transform-style: flat;/*preserve-3d;*/
+    border: solid black 1px;
+    overflow: hidden;
+}
+
+.wall {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 128px;
+    height: 128px;
+    transform-origin: 0px 0px;
+    /* transform-style: preserve-3d; */
+    /* radial-gradient(20px circle, #CBA 0%, #ABC 90px);*/
+    -webkit-transform-style: flat;
+    backface-visibility: hidden;
+}
+
+.texture-brick {
+    background: url(https://doug16k.com/vendor/textures/brick.jpg);
+    background-size: cover;
+}
+
+.texture-concrete {
+    background: url(https://doug16k.com/vendor/textures/concrete.jpg);
+    background-size: cover;
+}
+
+.texture-grass {
+    background: url(https://doug16k.com/vendor/textures/grass.png);
+    background-size: cover;
+}
+
+.texture-drywall {
+    background: url(https://doug16k.com/vendor/textures/walltexture.jpg);
+    background-size: cover;
+}
+
+.texture-asphalt {
+    background: url(https://doug16k.com/vendor/textures/asphalt.png);
+    background-size: cover;
+}
+
+.texture-carpet {
+    background: url(https://doug16k.com/vendor/textures/pattern.jpg);
+    background-size: cover;
+}
+
+.map-editor {
+    position: relative;
+    border: solid black 1px;
+    width: 1536px;
+    height: 864px;
+}
+
+.map-square {
+    position: absolute;
+    border: solid black 1px;
+    width: 14px;
+    height: 14px;
+}
+
+.map-palette {
+    position: relative;
+    margin-bottom: 4px;
+}
+
+.map-palette label {
+    margin: 8px;
+}
+
+.map-editor-container {
+    left: 849px;
+    position: absolute;
+    top: 0px;
+    right: 20px;
+    overflow: auto;
+    bottom: 0;
+}
+
+.map-arrow {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: block;
+    font-weight: bold;
+}
+
+.hidden {
+    display: none;
+}
+
+.view.no-backface-cull > .wall {
+    backface-visibility: visible;
+}

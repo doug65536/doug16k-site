@@ -1,0 +1,24 @@
+Click to toggle mouse capture, WASD movement, mouse look
+<!-- canvas only used for pointer lock -->
+<canvas id="ptrlock"></canvas>
+<div class="view">
+    <div class="wall"></div>
+</div>
+<div class="map-editor-container">
+    <label><input type="checkbox" class="map-editor-enabled" checked>Map Editor:</label>
+    <div class="map-palette">
+        <label><input type="checkbox" class="backface-cull-enabled" checked>Backface cull (buggy in chrome (51))</label>
+        <label><input value="" type="radio" name="brush" data-material="" class="palette-option">Empty</label>
+        <hr>
+        <label><input value="#555555" type="radio" name="brush" data-material=",concrete,concrete" class="palette-option">Concrete floor/ceiling</label>
+        <label><input value="#338833" type="radio" name="brush" data-material=",grass," class="palette-option">Grass floor / none</label>
+        <label><input value="#f4d984" type="radio" name="brush" data-material=",carpet,drywall" class="palette-option">Carpet floor / drywall ceiling</label>
+        <label><input value="#333333" type="radio" name="brush" data-material=",asphalt," class="palette-option">Asphalt floor / none</label>
+        <hr>
+        <label><input value="#f4d9c4" type="radio" name="brush" data-material="w,drywall" class="palette-option">White drywall wall</label>
+        <label><input value="#ba3e3e" type="radio" name="brush" data-material="w,brick" class="palette-option">Brick wall</label>
+        <label><input value="#999999" type="radio" name="brush" data-material="w,concrete" class="palette-option">Concrete wall</label>
+        <hr>
+    </div>
+    <div class="map-editor"><div class="map-square"></div></div>
+</div>
